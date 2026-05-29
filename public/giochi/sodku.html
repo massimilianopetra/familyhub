@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sudoku Tactician</title>
+    <style>
+        :root {
+            --bg: #1e1e24; --panel: #2a2b36; --text: #f4f4f6; --empty: #111217;
+            --hidden: #44475a; --revealed: #21222c; --accent: #50fa7b; --error: #ff5555; --fixed: #8be9fd;
+        }
+        body {
+            font-family: sans-serif; background: var(--bg); color: var(--text);
+            margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center;
+        }
+        h1 { margin: 5px 0; text-transform: uppercase; letter-spacing: 2px; font-size: 1.8rem; }
+        .subtitle { margin-top: 0; margin-bottom: 15px; color: #a0a2b1; font-size: 0.85rem; text-align: center; }
+        .game-container { background: var(--panel); padding: 15px; border-radius: 12px; box-shadow: 0 15px 35px rgba(0,0,0,0.6); width: 100%; max-width: 390px; box-sizing: border-box; }
+        .hud { display: flex; justify-content: space-between; align-items: center; background: var(--empty); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; }
+        select { background: var(--panel); color: var(--text); border: 1px solid var(--hidden); padding: 5px 8px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        #status { font-weight: bold; }
+        .grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 1px; background: #000; padding: 3px; border-radius: 6px; box-sizing: border-box; margin-bottom: 15px; }
+        .cell {
+            background: var(--revealed); aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; font-weight: bold; cursor: pointer; user-select: none; touch-action: manipulation; box-sizing: border-box; color: #fff; border: 1px solid #2d2f3f;
+        }
+        .cell:nth-child(3n) { border-right: 2px solid #000; }
+        .cell:nth-child(9n) { border-right: none; }
+        .r-2, .r-5 { border-bottom: 2px solid #000; }
+        .cell.fixed { color: var(--fixed); background: #1a2236; cursor: default; }
+        .key:disabled { opacity: 0.3; cursor: not-allowed; }
+        .cell.selected { background: #44475a!important; outline: 2px solid var(--fixed); outline-offset: -2px; }
+        .cell.error { background: var(--error)!important; color: #fff!important; }
+        .keypad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; }
+        .key { padding: 12px 0; background: var(--empty); border: 1px solid var(--hidden); color: var(--text); font-size: 1.2rem; font-weight: bold; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .key.action { background: var(--hidden); }
+        .btn-reset { width: 100%; padding: 12px; border: none; border-radius: 6px; background: var(--error); color: white; font-size: 0.95rem; font-weight: bold; cursor: pointer; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>Sudoku</h1>
+    <div class="subtitle">Seleziona una casella e usa il tastierino numerico per inserire i dati</div>
+
+    <div class="game-container">
+        <div class="hud">
+            <div>
+                <select id="difficulty" onchange="initGame()">
+                    <option value="easy">Facile</option>
+                    <option value="medium" selected>Medio</option>
+                    <option value="hard">Difficile</option>
+                </select>
+            </div>
+            <div id="status">🧠 In corso</div>
+        </div>
+
+        <div class="grid" id="grid"></div>
+
+        <div class="keypad">
+            <button class="key" data-num="1" onclick="inputNumber(1)">1</button>
+            <button class="key" data-num="2" onclick="inputNumber(2)">2</button>
+            <button class="key" data-num="3" onclick="inputNumber(3)">3</button>
+            <button class="key" data-num="4" onclick="inputNumber(4)">4</button>
+            <button class="key" data-num="5" onclick="inputNumber(5)">5</button>
+            <button class="key" data-num="6" onclick="inputNumber(6)">6</button>
+            <button class="key" data-num="7" onclick="inputNumber(7)">7</button>
+            <button class="key" data-num="8" onclick="inputNumber(8)">8</button>
+            <button class="key" data-num="9" onclick="inputNumber(9)">9</button>
+            <button class="key action" onclick="inputNumber(0)">❌</button>
+        </div>
+
+        <button class="btn-reset" onclick="initGame()">Nuova Partita</button>
+    </div>
+
+    <script>
+        let solution = [], board = [], fixedMask = [], selectedCell = null, gameOver = false, numberCounts = {};
+
+        function initGame() {
+            const gridDisplay = document.getElementById('grid');
+            gridDisplay.innerHTML = ''; selectedCell = null; gameOver = false;
+            document.getElementById('status').innerText = "🧠 In corso";
+            numberCounts = {1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0};
+
+            solution = Array.from({ length: 9 }, () => Array(9).fill(0));
+            fillSudoku(solution);
+            board = solution.map(row => row.slice());
+            fixedMask = Array.from({ length: 9 }, () => Array(9).fill(false));
+
+            const diff = document.getElementById('difficulty').value;
+            let cellsToRemove = diff === 'easy' ? 30 : diff === 'medium' ? 45 : 55;
+
+            while (cellsToRemove > 0) {
+                let r = Math.floor(Math.random() * 9), c = Math.floor(Math.random() * 9);
+                if (board[r][c] !== 0) { board[r][c] = 0; cellsToRemove--; }
+            }
+
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const cellEl = document.createElement('div');
+                    cellEl.classList.add('cell', `r-${r}`);
+                    cellEl.dataset.row = r; cellEl.dataset.col = c;
+                    if (board[r][c] !== 0) {
+                        cellEl.innerText = board[r][c]; cellEl.classList.add('fixed');
+                        fixedMask[r][c] = true;
+                        numberCounts[board[r][c]]++;
+                    } else {
+                        cellEl.addEventListener('click', () => selectCell(cellEl));
+                    }
+                    gridDisplay.appendChild(cellEl);
+                }
+            }
+            updateKeypad();
+            checkErrors();
+        }
+
+        function fillSudoku(grid) {
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (grid[r][c] === 0) {
+                        const numbers = [1,2,3,4,5,6,7,8,9].sort(() => Math.random() - 0.5);
+                        for (let num of numbers) {
+                            if (isValid(grid, r, c, num)) {
+                                grid[r][c] = num;
+                                if (fillSudoku(grid)) return true;
+                                grid[r][c] = 0;
+                            }
+                        }
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function isValid(grid, r, c, num) {
+            for (let i = 0; i < 9; i++) {
+                if (grid[r][i] === num || grid[i][c] === num) return false;
+            }
+            let boxR = Math.floor(r / 3) * 3, boxC = Math.floor(c / 3) * 3;
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    if (grid[boxR + i][boxC + j] === num) return false;
+                }
+            }
+            return true;
+        }
+
+        function selectCell(element) {
+            if (gameOver) return;
+            if (selectedCell) selectedCell.classList.remove('selected');
+            selectedCell = element; selectedCell.classList.add('selected');
+        }
+
+        function inputNumber(num) {
+            if (!selectedCell || gameOver) return;
+            const r = parseInt(selectedCell.dataset.row), c = parseInt(selectedCell.dataset.col);
+            if (fixedMask[r][c]) return;
+            const prev = board[r][c];
+            if (prev !== 0) numberCounts[prev]--;
+            board[r][c] = num;
+            selectedCell.innerText = num === 0 ? '' : num;
+            if (num !== 0) numberCounts[num]++;
+            updateKeypad();
+            checkErrors(); checkWin();
+        }
+
+        function updateKeypad() {
+            for (let n = 1; n <= 9; n++) {
+                const btn = document.querySelector(`.key[data-num="${n}"]`);
+                if (btn) {
+                    let count = 0;
+                    for (let r = 0; r < 9; r++)
+                        for (let c = 0; c < 9; c++)
+                            if (board[r][c] === n) count++;
+                    btn.disabled = count >= 9;
+                }
+            }
+        }
+
+        function checkErrors() {
+            document.querySelectorAll('.cell').forEach(cell => cell.classList.remove('error'));
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    let val = board[r][c]; if (val === 0) continue;
+                    let hasError = false;
+                    for (let i = 0; i < 9; i++) {
+                        if (i !== c && board[r][i] === val) hasError = true;
+                        if (i !== r && board[i][c] === val) hasError = true;
+                    }
+                    let boxR = Math.floor(r / 3) * 3, boxC = Math.floor(c / 3) * 3;
+                    for (let i = 0; i < 3; i++) {
+                        for (let j = 0; j < 3; j++) {
+                            let currR = boxR + i, currC = boxC + j;
+                            if ((currR !== r || currC !== c) && board[currR][currC] === val) hasError = true;
+                        }
+                    }
+                    if (hasError) document.querySelector(`[data-row="${r}"][data-col="${c}"]`).classList.add('error');
+                }
+            }
+        }
+
+        function checkWin() {
+            if (document.querySelectorAll('.cell.error').length > 0) return;
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) { if (board[r][c] === 0) return; }
+            }
+            gameOver = true; document.getElementById('status').innerText = "😎 COMPLETATO!";
+            if (selectedCell) selectedCell.classList.remove('selected');
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

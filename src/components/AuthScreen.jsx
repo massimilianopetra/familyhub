@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 
 export default function AuthScreen() {
@@ -20,6 +20,23 @@ export default function AuthScreen() {
       setErrore(error.message)
     }
     setLoading(false)
+  }
+
+  const handleForgotPassword = async () => {
+    setErrore('')
+    setSuccesso('')
+    if (!email) {
+      setErrore('Inserisci la tua email prima di richiedere il reset.')
+      return
+    }
+    setLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email)
+    setLoading(false)
+    if (error) {
+      setErrore(error.message)
+    } else {
+      setSuccesso('Email inviata! Controlla la tua casella di posta.')
+    }
   }
 
   const handleSignUp = async (e) => {
@@ -89,6 +106,10 @@ export default function AuthScreen() {
               </button>
             </div>
           </div>
+
+          <button type="button" onClick={handleForgotPassword} style={styles.forgotLink} disabled={loading}>
+            Hai dimenticato la password?
+          </button>
 
           {errore && <div style={styles.errorAlert}>{errore}</div>}
           {successo && <div style={styles.successAlert}>{successo}</div>}
@@ -236,5 +257,16 @@ const styles = {
   buttonSecondary: {
     backgroundColor: '#3ecf8e',
     color: '#ffffff',
+  },
+  forgotLink: {
+    background: 'none',
+    border: 'none',
+    color: '#666',
+    fontSize: '13px',
+    cursor: 'pointer',
+    textAlign: 'right',
+    padding: '0',
+    textDecoration: 'underline',
+    alignSelf: 'flex-end',
   },
 }

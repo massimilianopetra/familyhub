@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lights Out Retro Edition</title>
+    <style>
+        :root {
+            --bg-color: #1e1e24;
+            --panel-color: #2a2b36;
+            --text-color: #f4f4f6;
+            --accent-color: #ff5555;
+            --slot-empty: #111217; /* Luce spenta */
+            --slot-active: #f1c40f; /* Luce accesa - Giallo Retro */
+            --slot-active-glow: rgba(241, 196, 15, 0.4);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .subtitle {
+            margin-top: 0;
+            margin-bottom: 25px;
+            color: #a0a2b1;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .game-container {
+            background-color: var(--panel-color);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            width: 100%;
+            max-width: 440px;
+            box-sizing: border-box;
+        }
+
+        /* Statistiche di Gioco */
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            background: #111217;
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            border: 1px solid #21222c;
+        }
+
+        .stats-row span {
+            color: #50fa7b;
+        }
+
+        /* Griglia di Gioco 5x5 */
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+            background: #21222c;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #111217;
+        }
+
+        .light-cell {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            background-color: var(--slot-empty);
+            border: 2px solid #000;
+            box-shadow: inset 0 3px 5px rgba(0,0,0,0.6);
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s, transform 0.1s;
+        }
+
+        .light-cell:hover {
+            transform: scale(1.03);
+        }
+
+        /* Stato Attivo (Luce Accesa) */
+        .light-cell.on {
+            background-color: var(--slot-active);
+            box-shadow: inset 0 -4px 6px rgba(0,0,0,0.2), 
+                        0 0 15px var(--slot-active-glow);
+        }
+
+        .light-cell:active {
+            transform: scale(0.95);
+        }
+
+        /* Pannello dei Controlli */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: #111217;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        #btn-undo {
+            background-color: #f1c40f;
+            color: #111217;
+        }
+
+        #btn-undo:disabled {
+            background-color: #44475a;
+            color: #6272a4;
+            cursor: not-allowed;
+        }
+
+        #btn-reset {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .status-message {
+            margin-top: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+            min-height: 27px;
+        }
+        
+        .win { color: #50fa7b; }
+    </style>
+</head>
+<body>
+
+    <h1>Lights Out</h1>
+    <div class="subtitle">Edizione Retro • Spegni tutte le luci per vincere • Livelli sempre risolvibili</div>
+
+    <div class="game-container">
+        <!-- Pannello Statistiche -->
+        <div class="stats-row">
+            <div>Mosse: <span id="move-count">0</span></div>
+            <div>Stato: <span id="game-status">In Corso</span></div>
+        </div>
+
+        <!-- Griglia Luci Principale -->
+        <div class="board-grid" id="light-board"></div>
+
+        <!-- Controlli Giocatore -->
+        <div class="controls">
+            <div class="actions">
+                <button id="btn-undo" onclick="undoMove()" disabled>Annulla</button>
+                <button id="btn-reset" onclick="startNewGame()">Nuovo Gioco</button>
+            </div>
+        </div>
+
+        <!-- Messaggio di Vittoria finale -->
+        <div class="status-message" id="status-text"></div>
+    </div>
+
+    <script>
+        const GRID_SIZE = 5;
+        let board = [];       // Matrice 5x5 che tiene traccia dello stato (true = accesa, false = spenta)
+        let moveHistory = []; // Stack per gestire la cronologia dei click (Undo)
+        let moves = 0;
+        let isGameOver = false;
+
+        const boardElement = document.getElementById('light-board');
+        const moveCountElement = document.getElementById('move-count');
+        const statusElement = document.getElementById('status-text');
+        const gameStatusElement = document.getElementById('game-status');
+        const undoButton = document.getElementById('btn-undo');
+
+        // Crea la griglia grafica e la mappa logica iniziale
+        function createBoard() {
+            boardElement.innerHTML = '';
+            board = [];
+            
+            for (let r = 0; r < GRID_SIZE; r++) {
+                board[r] = [];
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    board[r][c] = false; // Inizia tutto spento
+                    
+                    const cell = document.createElement('div');
+                    cell.classList.add('light-cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    
+                    // Assegna il click alla cella
+                    cell.addEventListener('click', () => handleCellClick(r, c));
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        // Funzione core: inverte lo stato di una cella e aggiorna la grafica
+        function toggleLight(r, c) {
+            if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+                board[r][c] = !board[r][c];
+                const cell = boardElement.querySelector(`[data-row='${r}'][data-col='${c}']`);
+                if (board[r][c]) {
+                    cell.classList.add('on');
+                } else {
+                    cell.classList.remove('on');
+                }
+            }
+        }
+
+        // Applica l'inversione a croce (centro + 4 direzioni)
+        function toggleCross(r, c) {
+            toggleLight(r, c);       // Centro
+            toggleLight(r - 1, c);   // Sopra
+            toggleLight(r + 1, c);   // Sotto
+            toggleLight(r, c - 1);   // Sinistra
+            toggleLight(r, c + 1);   // Destra
+        }
+
+        // Gestione del click del giocatore
+        function handleCellClick(r, c) {
+            if (isGameOver) return;
+
+            // Registra la mossa nella cronologia prima di eseguirla
+            moveHistory.push({ row: r, col: c });
+            undoButton.disabled = false;
+
+            // Esegui la mossa e aumenta il punteggio
+            toggleCross(r, c);
+            moves++;
+            updateUI();
+            checkWin();
+        }
+
+        // Funzione per tornare indietro (Undo)
+        function undoMove() {
+            if (moveHistory.length === 0 || isGameOver) return;
+
+            // Preleva l'ultima mossa eseguita
+            const lastMove = moveHistory.pop();
+            
+            // Riesegue il click sulle stesse coordinate per invertire l'effetto
+            toggleCross(lastMove.row, lastMove.col);
+            
+            moves--;
+            updateUI();
+
+            if (moveHistory.length === 0) {
+                undoButton.disabled = true;
+            }
+        }
+
+        // Aggiorna i testi dell'interfaccia utente
+        function updateUI() {
+            moveCountElement.innerText = moves;
+        }
+
+        // Verifica se l'utente ha spento tutte le luci
+        function checkWin() {
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (board[r][c] === true) return; // C'è ancora almeno una luce accesa
+                }
+            }
+            
+            // Se il ciclo finisce, significa che sono tutte spente!
+            isGameOver = true;
+            statusElement.innerHTML = "<span class='win'>COMPLETATO! Ottimo lavoro!</span>";
+            gameStatusElement.innerText = "Vittoria";
+            undoButton.disabled = true;
+        }
+
+        // Genera un livello mescolando il tabellone all'indietro
+        function shuffleBoard() {
+            // Scegliamo un numero di click casuali tra 15 e 25 per alterare la tavola
+            const shuffles = Math.floor(Math.random() * 11) + 15; 
+            
+            for (let i = 0; i < shuffles; i++) {
+                const randomRow = Math.floor(Math.random() * GRID_SIZE);
+                const randomCol = Math.floor(Math.random() * GRID_SIZE);
+                toggleCross(randomRow, randomCol);
+            }
+
+            // Se per pura coincidenza il rimescolamento dovesse lasciare il tabellone vuoto, riesegui
+            let totalOn = 0;
+            board.forEach(row => row.forEach(cell => { if(cell) totalOn++; }));
+            if (totalOn === 0) shuffleBoard();
+        }
+
+        // Reset completo per una nuova partita
+        function startNewGame() {
+            moves = 0;
+            isGameOver = false;
+            moveHistory = [];
+            undoButton.disabled = true;
+            statusElement.innerText = '';
+            gameStatusElement.innerText = "In Corso";
+            updateUI();
+            
+            createBoard();
+            shuffleBoard();
+        }
+
+        // Avvio automatico al caricamento della pagina
+        startNewGame();
+    </script>
+</body>
+</html>
