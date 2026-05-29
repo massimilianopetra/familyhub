@@ -30,7 +30,8 @@ export default function AuthScreen() {
       return
     }
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(email)
+    const redirectTo = window.location.origin + window.location.pathname
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { emailRedirectTo: redirectTo })
     setLoading(false)
     if (error) {
       setErrore(error.message)
@@ -45,7 +46,12 @@ export default function AuthScreen() {
     setErrore('')
     setSuccesso('')
 
-    const { error } = await supabase.auth.signUp({ email, password })
+    const redirectTo = window.location.origin + window.location.pathname
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: redirectTo }
+    })
     if (error) {
       setErrore(error.message)
     } else {
