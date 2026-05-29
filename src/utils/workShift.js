@@ -38,33 +38,40 @@ function shiftColor(endTime) {
   return h < 14 ? '#4ade80' : '#fb923c'
 }
 
+function shiftsForDate(cursor) {
+  const diffDays  = Math.floor((cursor - REFERENCE_DATE) / 86400000)
+  const weeksPast = Math.floor(diffDays / 7)
+  const weekIndex = ((REFERENCE_WEEK_INDEX + weeksPast) % 24 + 24) % 24
+  const pattern   = wifeWorkPatterns[weekIndex]
+  const dayIndex  = (cursor.getDay() + 6) % 7
+  const shifts    = pattern[DAY_KEYS[dayIndex]] || []
+  return shifts.map(shift => ({
+    date: new Date(cursor),
+    start: shift.start,
+    end: shift.end,
+    color: shiftColor(shift.end),
+    weekLabel: `Settimana ${weekIndex + 1}`,
+  }))
+}
+
 export function generateMonthShifts(year, month) {
-  // Genera tutti i turni per il mese dato (month: 0-based)
   const result = []
-  const firstDay = new Date(year, month, 1)
-  const lastDay  = new Date(year, month + 1, 0)
-  const cursor   = new Date(firstDay)
-
-  while (cursor <= lastDay) {
-    const diffDays   = Math.floor((cursor - REFERENCE_DATE) / 86400000)
-    const weeksPast  = Math.floor(diffDays / 7)
-    const weekIndex  = ((REFERENCE_WEEK_INDEX + weeksPast) % 24 + 24) % 24
-    const pattern    = wifeWorkPatterns[weekIndex]
-    const dayIndex   = (cursor.getDay() + 6) % 7   // 0=lun … 6=dom
-    const shifts     = pattern[DAY_KEYS[dayIndex]] || []
-
-    for (const shift of shifts) {
-      result.push({
-        date: new Date(cursor),
-        start: shift.start,
-        end: shift.end,
-        color: shiftColor(shift.end),
-        weekLabel: `W${weekIndex + 1}`,
-      })
-    }
-
+  const cursor = new Date(year, month, 1)
+  const last   = new Date(year, month + 1, 0)
+  while (cursor <= last) {
+    result.push(...shiftsForDate(cursor))
     cursor.setDate(cursor.getDate() + 1)
   }
+  return result
+}
 
+export function generateRangeShifts(startDate, endDate) {
+  const result = []
+  const cursor = new Date(startDate); cursor.setHours(0,0,0,0)
+  const end    = new Date(endDate);   end.setHours(23,59,59,999)
+  while (cursor <= end) {
+    result.push(...shiftsForDate(cursor))
+    cursor.setDate(cursor.getDate() + 1)
+  }
   return result
 }
