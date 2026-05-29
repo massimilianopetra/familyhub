@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { generateMonthShifts, generateRangeShifts } from '../utils/workShift'
 
 const MONTHS_IT    = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
@@ -23,6 +23,16 @@ function getMonday(date) {
 function fmtDateFull(date) {
   const dow = DAYS_FULL[(date.getDay() + 6) % 7]
   return `${dow} ${date.getDate()} ${MONTHS_IT[date.getMonth()]} ${date.getFullYear()}`
+}
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+  return isMobile
 }
 
 // ── Toggle ─────────────────────────────────────────────────────
@@ -104,12 +114,12 @@ function ViewSelector({ view, setView }) {
 // ══════════════════════════════════════════════════════════════
 // VISTA MESE
 // ══════════════════════════════════════════════════════════════
-function MonthView({ year, month, shifts, showShifts, onDayClick }) {
+function MonthView({ year, month, shifts, showShifts, onDayClick, isMobile }) {
   const today = new Date()
 
   const cells = useMemo(() => {
-    const firstDay   = new Date(year, month, 1)
-    const startOff   = (firstDay.getDay() + 6) % 7
+    const firstDay = new Date(year, month, 1)
+    const startOff = (firstDay.getDay() + 6) % 7
     return Array.from({ length: 42 }, (_, i) => new Date(year, month, 1 - startOff + i))
   }, [year, month])
 
@@ -118,12 +128,12 @@ function MonthView({ year, month, shifts, showShifts, onDayClick }) {
   }
 
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:'4px' }}>
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap: isMobile ? '2px' : '4px' }}>
       {DAYS_SHORT.map(d => (
-        <div key={d} style={{ textAlign:'center', fontSize:'0.72rem', fontWeight:'700',
+        <div key={d} style={{ textAlign:'center', fontSize: isMobile ? '0.6rem' : '0.72rem', fontWeight:'700',
           color: (d==='Sab'||d==='Dom') ? '#4ade80' : '#64748b',
-          padding:'6px 0', letterSpacing:'0.8px', textTransform:'uppercase' }}>
-          {d}
+          padding: isMobile ? '4px 0' : '6px 0', letterSpacing:'0.5px', textTransform:'uppercase' }}>
+          {isMobile ? d.slice(0,1) : d}
         </div>
       ))}
       {cells.map((day, i) => {
@@ -134,15 +144,25 @@ function MonthView({ year, month, shifts, showShifts, onDayClick }) {
           <div key={i} onClick={() => onDayClick(day)}
             style={{ backgroundColor: isToday ? '#0c2340' : '#1e293b',
               border: isToday ? '1.5px solid #38bdf8' : '1px solid #1e293b',
-              borderRadius:'8px', padding:'6px', minHeight:'76px',
-              display:'flex', flexDirection:'column', gap:'3px',
-              opacity: isCurrent ? 1 : 0.35, cursor:'pointer',
-              transition:'border-color .15s' }}>
-            <span style={{ fontSize:'0.8rem', fontWeight:'600', alignSelf:'flex-end', lineHeight:1,
+              borderRadius: isMobile ? '5px' : '8px',
+              padding: isMobile ? '4px 3px' : '6px',
+              minHeight: isMobile ? '52px' : '76px',
+              display:'flex', flexDirection:'column', alignItems: isMobile ? 'center' : 'stretch', gap:'3px',
+              opacity: isCurrent ? 1 : 0.35, cursor:'pointer' }}>
+            <span style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', fontWeight:'600',
+              alignSelf: isMobile ? 'center' : 'flex-end', lineHeight:1,
               color: isToday ? '#38bdf8' : '#94a3b8' }}>
               {day.getDate()}
             </span>
-            {showShifts && dayShifts.map((s,j) => <ShiftChip key={j} shift={s} />)}
+            {showShifts && dayShifts.length > 0 && (
+              isMobile
+                ? <div style={{ display:'flex', gap:'2px', flexWrap:'wrap', justifyContent:'center' }}>
+                    {dayShifts.map((s,j) => (
+                      <div key={j} style={{ width:'7px', height:'7px', borderRadius:'50%', backgroundColor:s.color }} />
+                    ))}
+                  </div>
+                : dayShifts.map((s,j) => <ShiftChip key={j} shift={s} />)
+            )}
           </div>
         )
       })}
@@ -243,7 +263,8 @@ function DayView({ day, shifts, showShifts }) {
 // COMPONENTE PRINCIPALE
 // ══════════════════════════════════════════════════════════════
 export default function CalendarSection() {
-  const today = new Date()
+  const today    = new Date()
+  const isMobile = useIsMobile()
   const [view,        setView]        = useState('month')
   const [currentDate, setCurrentDate] = useState(new Date(today))
   const [showShifts,  setShowShifts]  = useState(true)
@@ -318,6 +339,7 @@ export default function CalendarSection() {
           shifts={shifts}
           showShifts={showShifts}
           onDayClick={goToDay}
+          isMobile={isMobile}
         />
       )}
       {view === 'week' && (
