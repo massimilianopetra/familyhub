@@ -63,6 +63,16 @@ function ShiftChip({ shift }) {
   )
 }
 
+// ── Chip mobile a due righe (vista mese su cellulare) ──────────
+function ShiftChipMobile({ shift }) {
+  return (
+    <div style={{ backgroundColor: shift.color+'22', border:`1px solid ${shift.color}`, borderRadius:'3px', padding:'1px 2px', fontSize:'0.52rem', color:shift.color, fontWeight:'700', lineHeight:'1.3', textAlign:'center', width:'100%' }}>
+      <div>{shift.start}</div>
+      <div>{shift.end}</div>
+    </div>
+  )
+}
+
 // ── Card turno (vista settimana/giorno) ────────────────────────
 function ShiftCard({ shift, detailed }) {
   return (
@@ -84,7 +94,7 @@ function ShiftCard({ shift, detailed }) {
 function Legend() {
   return (
     <div style={{ display:'flex', gap:'20px', flexWrap:'wrap', marginBottom:'12px' }}>
-      {[['#4ade80','Mattina (fine < 14:00)'],['#fb923c','Pomeriggio / Sera']].map(([color,label]) => (
+      {[['#4ade80','Mattina (fine ≤ 14:00)'],['#fb923c','Pomeriggio / Sera']].map(([color,label]) => (
         <div key={color} style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'0.75rem', color:'#64748b' }}>
           <div style={{ width:'10px', height:'10px', borderRadius:'50%', backgroundColor:color }} />
           {label}
@@ -156,10 +166,8 @@ function MonthView({ year, month, shifts, showShifts, onDayClick, isMobile }) {
             </span>
             {showShifts && dayShifts.length > 0 && (
               isMobile
-                ? <div style={{ display:'flex', gap:'2px', flexWrap:'wrap', justifyContent:'center' }}>
-                    {dayShifts.map((s,j) => (
-                      <div key={j} style={{ width:'7px', height:'7px', borderRadius:'50%', backgroundColor:s.color }} />
-                    ))}
+                ? <div style={{ display:'flex', flexDirection:'column', gap:'1px', width:'100%' }}>
+                    {dayShifts.map((s,j) => <ShiftChipMobile key={j} shift={s} />)}
                   </div>
                 : dayShifts.map((s,j) => <ShiftChip key={j} shift={s} />)
             )}

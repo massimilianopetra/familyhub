@@ -1,0 +1,20 @@
+{
+  "name": "FamilyHub",
+  "short_name": "FamilyHub",
+  "description": "La tua app di famiglia",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "lang": "it",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

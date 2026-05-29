@@ -32,10 +32,10 @@ const REFERENCE_WEEK_INDEX = 7
 
 const DAY_KEYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
 
-// Verde mattina (fine < 14:00), arancio pomeriggio/sera (fine >= 14:00)
+// Verde mattina (fine ≤ 14:00), arancio pomeriggio/sera (fine > 14:00)
 function shiftColor(endTime) {
-  const [h] = endTime.split(':').map(Number)
-  return h < 14 ? '#4ade80' : '#fb923c'
+  const [h, m] = endTime.split(':').map(Number)
+  return (h < 14 || (h === 14 && m === 0)) ? '#4ade80' : '#fb923c'
 }
 
 function shiftsForDate(cursor) {
