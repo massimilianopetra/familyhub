@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastermind Original Edition</title>
+    <style>
+        :root {
+            --bg-color: #1e1e24;
+            --panel-color: #2a2b36;
+            --text-color: #f4f4f6;
+            --accent-color: #d63031;
+            --slot-empty: #111217;
+            
+            /* I 6 colori classici del gioco originale */
+            --color-1: #e74c3c; /* Rosso */
+            --color-2: #2ecc71; /* Verde */
+            --color-3: #3498db; /* Blu */
+            --color-4: #f1c40f; /* Giallo */
+            --color-5: #e67e22; /* Arancione */
+            --color-6: #9b59b6; /* Viola */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .subtitle {
+            margin-top: 0;
+            margin-bottom: 25px;
+            color: #a0a2b1;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .game-container {
+            background-color: var(--panel-color);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            width: 100%;
+            max-width: 440px;
+            box-sizing: border-box;
+        }
+
+        /* Codice Segreto */
+        .secret-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #111217;
+            margin-bottom: 20px;
+        }
+
+        /* Tabellone principale */
+        .board {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 25px;
+            max-height: 450px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #21222c;
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid #111217;
+        }
+
+        .row.active {
+            border: 1px solid #50fa7b;
+            background: #282a36;
+        }
+
+        .slots {
+            display: flex;
+            gap: 12px;
+        }
+
+        .peg {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--slot-empty);
+            border: 2px solid #000;
+            box-shadow: inset 0 3px 5px rgba(0,0,0,0.6);
+            transition: transform 0.1s ease;
+            cursor: pointer;
+        }
+
+        .board .peg {
+            cursor: default;
+        }
+
+        /* Classi Colore */
+        .c-1 { background: var(--color-1); box-shadow: inset 0 -4px 6px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3); }
+        .c-2 { background: var(--color-2); box-shadow: inset 0 -4px 6px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3); }
+        .c-3 { background: var(--color-3); box-shadow: inset 0 -4px 6px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3); }
+        .c-4 { background: var(--color-4); box-shadow: inset 0 -4px 6px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3); }
+        .c-5 { background: var(--color-5); box-shadow: inset 0 -4px 6px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3); }
+        .c-6 { background: var(--color-6); box-shadow: inset 0 -4px 6px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3); }
+        
+        .secret-hidden {
+            background: #44475a;
+            border-color: #111217;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #bdc3c7;
+            font-size: 1.1rem;
+            box-shadow: none;
+        }
+
+        /* Griglia Pioli di Verifica Chiave (Neri / Bianchi) */
+        .hints {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            width: 34px;
+            height: 34px;
+            background: #111217;
+            padding: 4px;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .hint-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #282a36;
+            border: 1px solid #000;
+        }
+
+        /* Pioli Chiave Originali */
+        .hint-dot.black { background-color: #000000; border-color: #333; } /* Posizione + Colore OK */
+        .hint-dot.white { background-color: #ffffff; border-color: #ccc; } /* Solo Colore OK */
+
+        /* Pannello dei Controlli */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: #111217;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .color-picker {
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .picker-peg {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.15s;
+            border: 2px solid #000;
+        }
+
+        .picker-peg:hover {
+            transform: scale(1.15);
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        #btn-submit {
+            background-color: #50fa7b;
+            color: #111217;
+        }
+
+        #btn-submit:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        #btn-submit:disabled {
+            background-color: #44475a;
+            color: #6272a4;
+            cursor: not-allowed;
+        }
+
+        #btn-reset {
+            background-color: #ff5555;
+            color: white;
+            flex: 0.4;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .status-message {
+            margin-top: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+            min-height: 27px;
+        }
+        
+        .win { color: #50fa7b; }
+        .lose { color: #ff5555; }
+
+        .board::-webkit-scrollbar { width: 6px; }
+        .board::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        .board::-webkit-scrollbar-thumb { background: #44475a; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <h1>Mastermind</h1>
+    <div class="subtitle">Edizione Classica • 10 Tentativi • I colori possono ripetersi</div>
+
+    <div class="game-container">
+        <!-- Area Codice Segreto -->
+        <div class="secret-row" id="secret-row">
+            <div class="peg secret-hidden">?</div>
+            <div class="peg secret-hidden">?</div>
+            <div class="peg secret-hidden">?</div>
+            <div class="peg secret-hidden">?</div>
+        </div>
+
+        <!-- Tabellone Storico -->
+        <div class="board" id="game-board"></div>
+
+        <!-- Controlli Giocatore -->
+        <div class="controls">
+            <div class="row active">
+                <div class="slots" id="current-guess-slots">
+                    <div class="peg" data-index="0" onclick="clearSlot(0)"></div>
+                    <div class="peg" data-index="1" onclick="clearSlot(1)"></div>
+                    <div class="peg" data-index="2" onclick="clearSlot(2)"></div>
+                    <div class="peg" data-index="3" onclick="clearSlot(3)"></div>
+                </div>
+                <div class="hints"></div>
+            </div>
+
+            <!-- Tavolozza di Selezione -->
+            <div class="color-picker">
+                <div class="picker-peg c-1" onclick="selectColor(1)"></div>
+                <div class="picker-peg c-2" onclick="selectColor(2)"></div>
+                <div class="picker-peg c-3" onclick="selectColor(3)"></div>
+                <div class="picker-peg c-4" onclick="selectColor(4)"></div>
+                <div class="picker-peg c-5" onclick="selectColor(5)"></div>
+                <div class="picker-peg c-6" onclick="selectColor(6)"></div>
+            </div>
+
+            <div class="actions">
+                <button id="btn-reset" onclick="initGame()">Nuovo</button>
+                <button id="btn-submit" onclick="submitGuess()" disabled>Conferma</button>
+            </div>
+        </div>
+
+        <div class="status-message" id="status-msg"></div>
+    </div>
+
+    <script>
+        const MAX_ATTEMPTS = 10;
+        const CODE_LENGTH = 4;
+        
+        let secretCode = [];
+        let currentGuess = [null, null, null, null];
+        let attemptsHistory = [];
+        let gameOver = false;
+
+        window.onload = initGame;
+
+        function initGame() {
+            secretCode = [];
+            currentGuess = [null, null, null, null];
+            attemptsHistory = [];
+            gameOver = false;
+
+            // Generazione con ripetizione: pesca casuale libera da 1 a 6
+            for (let i = 0; i < CODE_LENGTH; i++) {
+                secretCode.push(Math.floor(Math.random() * 6) + 1);
+            }
+
+            const secretRow = document.getElementById('secret-row');
+            secretRow.innerHTML = `
+                <div class="peg secret-hidden">?</div>
+                <div class="peg secret-hidden">?</div>
+                <div class="peg secret-hidden">?</div>
+                <div class="peg secret-hidden">?</div>
+            `;
+
+            document.getElementById('status-msg').className = 'status-message';
+            document.getElementById('status-msg').innerText = '';
+            
+            updateCurrentGuessRow();
+            renderBoard();
+            updateSubmitButton();
+        }
+
+        function selectColor(colorNumber) {
+            if (gameOver) return;
+
+            // Nota: Rimosso il blocco del duplicato, ora si possono ripetere i colori liberamente
+            const freeSlotIndex = currentGuess.indexOf(null);
+            if (freeSlotIndex !== -1) {
+                currentGuess[freeSlotIndex] = colorNumber;
+                updateCurrentGuessRow();
+                updateSubmitButton();
+            }
+        }
+
+        function clearSlot(index) {
+            if (gameOver) return;
+            currentGuess[index] = null;
+            updateCurrentGuessRow();
+            updateSubmitButton();
+        }
+
+        function updateCurrentGuessRow() {
+            const slots = document.getElementById('current-guess-slots').children;
+            for (let i = 0; i < CODE_LENGTH; i++) {
+                slots[i].className = 'peg';
+                if (currentGuess[i] !== null) {
+                    slots[i].classList.add(`c-${currentGuess[i]}`);
+                }
+            }
+        }
+
+        function updateSubmitButton() {
+            const isComplete = currentGuess.every(color => color !== null);
+            document.getElementById('btn-submit').disabled = !isComplete;
+        }
+
+        function submitGuess() {
+            if (gameOver) return;
+
+            let blacks = 0; // Posizione e colore giusti
+            let whites = 0; // Solo colore giusto
+
+            // Array di tracciamento per gestire correttamente i colori ripetuti senza doppi conteggi
+            let secretMatch = [false, false, false, false];
+            let guessMatch = [false, false, false, false];
+
+            // 1° Passo: Conta i pioli Neri (corrispondenze perfette)
+            for (let i = 0; i < CODE_LENGTH; i++) {
+                if (currentGuess[i] === secretCode[i]) {
+                    blacks++;
+                    secretMatch[i] = true;
+                    guessMatch[i] = true;
+                }
+            }
+
+            // 2° Passo: Conta i pioli Bianchi (corrispondenze di colore residue)
+            for (let i = 0; i < CODE_LENGTH; i++) {
+                if (guessMatch[i]) continue; // Salta se ha già un piolo nero
+                
+                for (let j = 0; j < CODE_LENGTH; j++) {
+                    if (!secretMatch[j] && currentGuess[i] === secretCode[j]) {
+                        whites++;
+                        secretMatch[j] = true; // Associa il colore in modo univoco
+                        break;
+                    }
+                }
+            }
+
+            attemptsHistory.push({
+                guess: [...currentGuess],
+                blacks: blacks,
+                whites: whites
+            });
+
+            currentGuess = [null, null, null, null];
+            updateCurrentGuessRow();
+            updateSubmitButton();
+            renderBoard();
+            checkGameStatus(blacks);
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+
+            attemptsHistory.forEach(attempt => {
+                const row = document.createElement('div');
+                row.className = 'row';
+
+                let slotsHtml = '<div class="slots">';
+                attempt.guess.forEach(color => {
+                    slotsHtml += `<div class="peg c-${color}"></div>`;
+                });
+                slotsHtml += '</div>';
+
+                let hintsHtml = '<div class="hints">';
+                let dotsAdded = 0;
+                
+                for (let i = 0; i < attempt.blacks; i++) {
+                    hintsHtml += '<div class="hint-dot black"></div>';
+                    dotsAdded++;
+                }
+                for (let i = 0; i < attempt.whites; i++) {
+                    hintsHtml += '<div class="hint-dot white"></div>';
+                    dotsAdded++;
+                }
+                while (dotsAdded < CODE_LENGTH) {
+                    hintsHtml += '<div class="hint-dot"></div>';
+                    dotsAdded++;
+                }
+                hintsHtml += '</div>';
+
+                row.innerHTML = slotsHtml + hintsHtml;
+                board.appendChild(row);
+            });
+
+            board.scrollTop = board.scrollHeight;
+        }
+
+        function checkGameStatus(lastBlacks) {
+            const statusMsg = document.getElementById('status-msg');
+
+            if (lastBlacks === CODE_LENGTH) {
+                gameOver = true;
+                statusMsg.innerText = "🏆 Vittoria! Hai decifrato il codice originale!";
+                statusMsg.classList.add('win');
+                revealSecret();
+            } else if (attemptsHistory.length >= MAX_ATTEMPTS) {
+                gameOver = true;
+                statusMsg.innerText = "Game Over! Hai esaurito i 10 tentativi.";
+                statusMsg.classList.add('lose');
+                revealSecret();
+            }
+            
+            if (gameOver) {
+                document.getElementById('btn-submit').disabled = true;
+            }
+        }
+
+        function revealSecret() {
+            const secretRow = document.getElementById('secret-row');
+            secretRow.innerHTML = '';
+            secretCode.forEach(color => {
+                secretRow.innerHTML += `<div class="peg c-${color}"></div>`;
+            });
+        }
+    </script>
+</body>
+</html>
