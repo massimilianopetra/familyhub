@@ -141,7 +141,13 @@ function EventCard({ event, detailed, isOwner, onEdit }) {
     : null
 
   return (
-    <div style={{ borderLeft:`3px solid ${color}`, backgroundColor: color+'18', borderRadius:'6px', padding: detailed ? '10px 14px' : '4px 6px', display:'flex', flexDirection:'column', gap:'2px', overflow:'hidden' }}>
+    <div style={{
+      borderLeft: detailed && !isOwner ? `3px dashed ${color}88` : `3px solid ${color}`,
+      backgroundColor: detailed && !isOwner ? color+'0d' : color+'18',
+      opacity: detailed && !isOwner ? 0.82 : 1,
+      borderRadius:'6px', padding: detailed ? '10px 14px' : '4px 6px',
+      display:'flex', flexDirection:'column', gap:'2px', overflow:'hidden',
+    }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'6px' }}>
         <span style={{ fontSize: detailed ? '0.95rem' : '0.72rem', fontWeight:'700', color:'#f1f5f9', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
           {emoji} {event.title}
