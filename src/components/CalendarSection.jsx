@@ -157,7 +157,7 @@ function EventCard({ event, detailed, isOwner, onEdit }) {
           {emoji} {event.title}
         </span>
         {isOwner && (
-          <button onClick={() => onEdit(event)}
+          <button onClick={e => { e.stopPropagation(); onEdit(event) }}
             style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:'0.85rem', padding:'0 2px', lineHeight:1, flexShrink:0 }}>
             ✏️
           </button>
@@ -562,9 +562,9 @@ function WeekView({ monday, shifts, showShifts, dbEvents, currentUserId, onDayCl
         const dayShifts = shiftsForDay(day)
         const dayEvents = eventsForDay(day)
         return (
-          <div key={i} style={{ display:'flex', flexDirection:'column', gap:'4px', minWidth:0 }}>
-            <div onClick={() => onDayClick(day)}
-              style={{ textAlign:'center', padding:'8px 4px', borderRadius:'8px', cursor:'pointer',
+          <div key={i} onClick={() => onDayClick(day)}
+            style={{ display:'flex', flexDirection:'column', gap:'4px', minWidth:0, cursor:'pointer' }}>
+            <div style={{ textAlign:'center', padding:'8px 4px', borderRadius:'8px',
                 backgroundColor: isToday ? '#1e40af' : '#1e293b',
                 border: isToday ? '1px solid #3b82f6' : '1px solid #334155' }}>
               <div style={{ fontSize:'0.68rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.6px',
