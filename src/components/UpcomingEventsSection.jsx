@@ -65,7 +65,7 @@ export default function UpcomingEventsSection({ session }) {
 
   async function fetchEvents() {
     const today      = new Date(); today.setHours(0,0,0,0)
-    const twoMonths  = new Date(today); twoMonths.setMonth(twoMonths.getMonth() + 2)
+    const twoMonths  = new Date(today); twoMonths.setMonth(twoMonths.getMonth() + 3)
     const todayStr   = dateToStr(today)
     const limitStr   = dateToStr(twoMonths)
 
@@ -111,7 +111,7 @@ export default function UpcomingEventsSection({ session }) {
             Prossimi eventi
           </h2>
           <p style={{ margin:'4px 0 0', fontSize:'0.78rem', color:'#64748b' }}>
-            Prossimi 2 mesi · {filteredEvents.length} {filteredEvents.length === 1 ? 'evento' : 'eventi'}
+            Prossimi 3 mesi · {filteredEvents.length} {filteredEvents.length === 1 ? 'evento' : 'eventi'}
           </p>
         </div>
         <Toggle checked={onlyMyEvents} onChange={setOnlyMyEvents} label="Solo miei" />
