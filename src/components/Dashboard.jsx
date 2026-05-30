@@ -108,7 +108,7 @@ export default function Dashboard({ session }) {
       {/* ── MAIN ─────────────────────────────────────────────── */}
       <main style={s.main}>
         {section === 'games'    && <GamesSection />}
-        {section === 'calendar' && <CalendarSection />}
+        {section === 'calendar' && <CalendarSection session={session} />}
       </main>
     </div>
   )

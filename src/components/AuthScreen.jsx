@@ -64,7 +64,7 @@ export default function AuthScreen() {
     <div style={styles.container}>
       <div style={styles.card}>
         <h3 style={styles.title}>Benvenuto</h3>
-        <p style={styles.subtitle}>Accedi o crea un nuovo account</p>
+        <p style={styles.subtitle}>Inserisci le tue credenziali per accedere</p>
 
         <form style={styles.form}>
           <div style={styles.inputGroup}>
@@ -120,23 +120,25 @@ export default function AuthScreen() {
           {errore && <div style={styles.errorAlert}>{errore}</div>}
           {successo && <div style={styles.successAlert}>{successo}</div>}
 
-          <div style={styles.buttonGroup}>
-            <button 
-              onClick={handleLogin} 
-              style={{ ...styles.button, ...styles.buttonPrimary }}
-              disabled={loading}
-            >
-              {loading ? 'Attendi...' : 'Accedi'}
-            </button>
-            
-            <button 
-              onClick={handleSignUp} 
-              style={{ ...styles.button, ...styles.buttonSecondary }}
-              disabled={loading}
-            >
-              Registrati
-            </button>
+          <button
+            onClick={handleLogin}
+            style={{ ...styles.button, ...styles.buttonPrimary }}
+            disabled={loading}
+          >
+            {loading ? 'Attendi...' : 'Accedi'}
+          </button>
+
+          <div style={styles.divider}>
+            <span style={styles.dividerText}>Non hai ancora un account?</span>
           </div>
+
+          <button
+            onClick={handleSignUp}
+            style={{ ...styles.button, ...styles.buttonSecondary }}
+            disabled={loading}
+          >
+            Crea account
+          </button>
         </form>
       </div>
     </div>
@@ -241,28 +243,36 @@ const styles = {
     borderRadius: '6px',
     fontSize: '13px',
   },
-  buttonGroup: {
-    display: 'flex',
-    gap: '12px',
-    marginTop: '8px',
-  },
   button: {
-    flex: 1,
+    width: '100%',
     padding: '12px',
     borderRadius: '6px',
     fontWeight: '500',
     fontSize: '14px',
     cursor: 'pointer',
     border: 'none',
-    transition: 'background-color 0.2s',
+    transition: 'opacity 0.2s',
   },
   buttonPrimary: {
     backgroundColor: '#1c1c1c',
     color: '#ffffff',
   },
   buttonSecondary: {
-    backgroundColor: '#3ecf8e',
-    color: '#ffffff',
+    backgroundColor: 'transparent',
+    color: '#888888',
+    border: '1px solid #dddddd',
+    fontSize: '13px',
+  },
+  divider: {
+    display: 'flex',
+    alignItems: 'center',
+    margin: '4px 0',
+  },
+  dividerText: {
+    width: '100%',
+    textAlign: 'center',
+    fontSize: '12px',
+    color: '#aaaaaa',
   },
   forgotLink: {
     background: 'none',
