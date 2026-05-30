@@ -151,6 +151,7 @@ export default function UpcomingEventsSection({ session }) {
                   const { emoji, label: typeLabel, color } = getEventType(event.event_type)
                   const badge     = buildBadge(event)
                   const isMultiDay = event.end_date && event.end_date !== event.event_date
+                  const isOwn      = event.user_id === currentUserId
                   const times      = event.start_time
                     ? event.end_time
                       ? `${event.start_time.slice(0,5)} – ${event.end_time.slice(0,5)}`
@@ -159,26 +160,39 @@ export default function UpcomingEventsSection({ session }) {
 
                   return (
                     <div key={event.id} style={{
-                      backgroundColor:'#1e293b',
-                      borderLeft:`4px solid ${color}`,
+                      backgroundColor: isOwn ? '#1e293b' : '#161e2e',
+                      borderLeft: isOwn ? `4px solid ${color}` : `4px dashed ${color}88`,
                       borderRadius:'0 14px 14px 0',
                       padding:'14px 16px',
                       display:'flex', flexDirection:'column', gap:'8px',
                       boxShadow:'0 2px 12px rgba(0,0,0,0.3)',
+                      opacity: isOwn ? 1 : 0.82,
                     }}>
 
-                      {/* Riga 1: tipo + badge */}
+                      {/* Riga 1: tipo + badge + famiglia */}
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px' }}>
-                        <span style={{ fontSize:'0.75rem', color, fontWeight:'700', display:'flex', alignItems:'center', gap:'4px' }}>
+                        <span style={{ fontSize:'0.75rem', color: isOwn ? color : color+'aa', fontWeight:'700', display:'flex', alignItems:'center', gap:'4px' }}>
                           {emoji} {typeLabel}
                         </span>
-                        <span style={{
-                          backgroundColor: color+'22', color, border:`1px solid ${color}55`,
-                          borderRadius:'20px', padding:'2px 10px',
-                          fontSize:'0.7rem', fontWeight:'700', whiteSpace:'nowrap',
-                        }}>
-                          {badge.text}
-                        </span>
+                        <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                          {!isOwn && (
+                            <span style={{
+                              backgroundColor:'#334155', color:'#94a3b8',
+                              borderRadius:'20px', padding:'2px 8px',
+                              fontSize:'0.68rem', fontWeight:'600', whiteSpace:'nowrap',
+                            }}>
+                              👤 Famiglia
+                            </span>
+                          )}
+                          <span style={{
+                            backgroundColor: color+'22', color: isOwn ? color : color+'aa',
+                            border:`1px solid ${color}${isOwn ? '55' : '33'}`,
+                            borderRadius:'20px', padding:'2px 10px',
+                            fontSize:'0.7rem', fontWeight:'700', whiteSpace:'nowrap',
+                          }}>
+                            {badge.text}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Riga 2: titolo */}
