@@ -35,6 +35,33 @@
         .action { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         #btn-check { background: #50fa7b; color: #111217; }
         #btn-reset { background: #ff5555; color: #fff; }
+
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.72); z-index: 1000;
+            align-items: center; justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: #2a2b36; border: 1px solid #44475a;
+            border-radius: 18px; padding: 30px 26px; max-width: 310px; width: 88%;
+            text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.85);
+            animation: modalPop 0.2s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        @keyframes modalPop {
+            from { transform: scale(0.78); opacity: 0; }
+            to   { transform: scale(1);    opacity: 1; }
+        }
+        .modal-icon  { font-size: 2.8rem; margin-bottom: 10px; }
+        .modal-title { margin: 0 0 10px; font-size: 1.25rem; font-weight: bold; color: #f4f4f6; letter-spacing: 1px; }
+        .modal-msg   { margin: 0 0 24px; color: #a0a2b1; font-size: 0.88rem; line-height: 1.55; }
+        .modal-buttons { display: flex; gap: 10px; }
+        .modal-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: bold; cursor: pointer; transition: transform 0.1s, opacity 0.15s; }
+        .modal-btn:active { transform: scale(0.96); }
+        .modal-btn:hover  { opacity: 0.88; }
+        .modal-btn-cancel  { background: #44475a; color: #f4f4f6; }
+        .modal-btn-confirm { background: #ff5555; color: #fff; }
     </style>
 </head>
 <body>
@@ -58,7 +85,7 @@
 
         <div class="action-buttons">
             <button id="btn-check" class="action" onclick="checkVictoryManually()">Verifica Mappa</button>
-            <button id="btn-reset" class="action" onclick="initGame()">Nuova Partita</button>
+            <button id="btn-reset" class="action" onclick="askNewGame()">Nuova Partita</button>
         </div>
     </div>
 
@@ -183,7 +210,35 @@
             }
         }
 
+        function askNewGame() {
+            document.getElementById('confirmModal').classList.add('active');
+        }
+        function closeModal() {
+            document.getElementById('confirmModal').classList.remove('active');
+        }
+        function confirmNewGame() {
+            closeModal();
+            initGame();
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('confirmModal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+        });
+
         initGame();
     </script>
+
+    <div id="confirmModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-icon">💣</div>
+            <h2 class="modal-title">Nuova Partita?</h2>
+            <p class="modal-msg">Il progresso attuale andrà perso.<br>Sei sicuro di voler ricominciare?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeModal()">Annulla</button>
+                <button class="modal-btn modal-btn-confirm" onclick="confirmNewGame()">Sì, inizia!</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
