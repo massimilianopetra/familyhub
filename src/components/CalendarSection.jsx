@@ -1,22 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { generateMonthShifts, generateRangeShifts } from '../utils/workShift'
+import { EVENT_TYPES, getEventType } from '../utils/eventTypes'
 
 const MONTHS_IT    = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
 const MONTHS_SHORT = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
 const DAYS_SHORT   = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom']
 const DAYS_FULL    = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica']
-const EVENT_TYPES = [
-  { id: 'visita',  label: 'Visita medica',    color: '#ef4444', emoji: '🏥' },
-  { id: 'ferie',   label: 'Ferie',             color: '#fbbf24', emoji: '🏖️' },
-  { id: 'teatro',  label: 'Teatro / Concerto', color: '#a78bfa', emoji: '🎭' },
-  { id: 'ripetizioni', label: 'Ripetizioni',    color: '#2dd4bf', emoji: '📚' },
-  { id: 'altro',       label: 'Altro',          color: '#60a5fa', emoji: '📌' },
-]
-
-function getEventType(typeId) {
-  return EVENT_TYPES.find(t => t.id === typeId) ?? EVENT_TYPES[3]
-}
 
 function isSameDay(a, b) {
   return a.getFullYear() === b.getFullYear() &&

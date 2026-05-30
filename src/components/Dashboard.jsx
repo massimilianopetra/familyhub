@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import GamesSection from './GamesSection'
 import CalendarSection from './CalendarSection'
+import UpcomingEventsSection from './UpcomingEventsSection'
 
 const NAV = [
   { id: 'games',    icon: '🎮', label: 'Giochi' },
   { id: 'calendar', icon: '📅', label: 'Calendario' },
+  { id: 'upcoming', icon: '🗓️', label: 'Prossimi' },
 ]
 
 function useIsMobile() {
@@ -109,6 +111,7 @@ export default function Dashboard({ session }) {
       <main style={s.main}>
         {section === 'games'    && <GamesSection />}
         {section === 'calendar' && <CalendarSection session={session} />}
+        {section === 'upcoming' && <UpcomingEventsSection session={session} />}
       </main>
     </div>
   )
