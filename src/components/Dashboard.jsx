@@ -3,8 +3,11 @@ import { supabase } from '../supabaseClient'
 import GamesSection from './GamesSection'
 import CalendarSection from './CalendarSection'
 import UpcomingEventsSection from './UpcomingEventsSection'
+import AdminSection from './AdminSection'
 
-const NAV = [
+const SUPER_USER = 'massimiliano.petra@gmail.com'
+
+const NAV_BASE = [
   { id: 'games',    icon: '🎮', label: 'Giochi' },
   { id: 'calendar', icon: '📅', label: 'Calendario' },
   { id: 'upcoming', icon: '🗓️', label: 'Prossimi' },
@@ -33,7 +36,11 @@ function HamburgerIcon() {
 export default function Dashboard({ session }) {
   const [section,    setSection]    = useState('calendar')
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const isMobile = useIsMobile()
+  const isMobile  = useIsMobile()
+  const isSuperUser = session.user.email === SUPER_USER
+  const nav = isSuperUser
+    ? [...NAV_BASE, { id: 'admin', icon: '⚙️', label: 'Admin' }]
+    : NAV_BASE
 
   function navTo(id) {
     setSection(id)
@@ -51,7 +58,7 @@ export default function Dashboard({ session }) {
             <span style={s.brandName}>FamilyHub</span>
           </div>
           <nav style={s.nav}>
-            {NAV.map(item => (
+            {nav.map(item => (
               <button key={item.id} onClick={() => setSection(item.id)}
                 style={{ ...s.navItem, ...(section === item.id ? s.navItemActive : {}) }}>
                 <span style={s.navIcon}>{item.icon}</span>
@@ -90,7 +97,7 @@ export default function Dashboard({ session }) {
             </div>
 
             <nav style={s.drawerNav}>
-              {NAV.map(item => (
+              {nav.map(item => (
                 <button key={item.id} onClick={() => navTo(item.id)}
                   style={{ ...s.drawerItem, ...(section === item.id ? s.drawerItemActive : {}) }}>
                   <span style={s.drawerItemIcon}>{item.icon}</span>
@@ -112,6 +119,7 @@ export default function Dashboard({ session }) {
         {section === 'games'    && <GamesSection />}
         {section === 'calendar' && <CalendarSection session={session} />}
         {section === 'upcoming' && <UpcomingEventsSection session={session} />}
+        {section === 'admin'    && isSuperUser && <AdminSection />}
       </main>
     </div>
   )

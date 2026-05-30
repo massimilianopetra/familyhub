@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 
 export default function AuthScreen() {
@@ -8,6 +8,14 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false)
   const [errore, setErrore] = useState('')
   const [successo, setSuccesso] = useState('')
+  const [registrationEnabled, setRegistrationEnabled] = useState(false)
+
+  useEffect(() => {
+    supabase.from('app_settings').select('value').eq('key','registration_enabled').single()
+      .then(({ data }) => {
+        if (data) setRegistrationEnabled(data.value === true || data.value === 'true')
+      })
+  }, [])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -132,13 +140,15 @@ export default function AuthScreen() {
             <span style={styles.dividerText}>Non hai ancora un account?</span>
           </div>
 
-          <button
-            onClick={handleSignUp}
-            style={{ ...styles.button, ...styles.buttonSecondary }}
-            disabled={loading}
-          >
-            Crea account
-          </button>
+          {registrationEnabled && (
+            <button
+              onClick={handleSignUp}
+              style={{ ...styles.button, ...styles.buttonSecondary }}
+              disabled={loading}
+            >
+              Crea account
+            </button>
+          )}
         </form>
       </div>
     </div>
