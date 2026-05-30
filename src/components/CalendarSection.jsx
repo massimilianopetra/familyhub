@@ -129,9 +129,11 @@ function EventChipMobile({ event }) {
 // ── Card evento DB (vista settimana/giorno) ────────────────────
 function EventCard({ event, detailed, isOwner, onDelete }) {
   const { emoji, label: typeLabel, color } = getEventType(event.event_type)
-  const times = event.start_time && event.end_time
-    ? `${event.start_time.slice(0,5)} – ${event.end_time.slice(0,5)}`
-    : event.start_time?.slice(0,5) || event.end_time?.slice(0,5) || null
+  const times = event.start_time
+    ? event.end_time
+      ? `${event.start_time.slice(0,5)} – ${event.end_time.slice(0,5)}`
+      : event.start_time.slice(0,5)
+    : null
 
   return (
     <div style={{ borderLeft:`3px solid ${color}`, backgroundColor: color+'18', borderRadius:'6px', padding: detailed ? '10px 14px' : '6px 10px', display:'flex', flexDirection:'column', gap:'3px' }}>
@@ -146,9 +148,9 @@ function EventCard({ event, detailed, isOwner, onDelete }) {
           </button>
         )}
       </div>
-      {times && (
-        <span style={{ fontSize: detailed ? '0.88rem' : '0.73rem', color, fontWeight:'600' }}>{times}</span>
-      )}
+      <span style={{ fontSize: detailed ? '0.88rem' : '0.73rem', color, fontWeight:'600' }}>
+        {times ?? 'Tutto il giorno'}
+      </span>
       {detailed && (
         <span style={{ fontSize:'0.75rem', color: color+'cc', fontWeight:'500' }}>{typeLabel}</span>
       )}
