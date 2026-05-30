@@ -37,6 +37,18 @@ function fmtDateFull(date) {
   return `${dow} ${date.getDate()} ${MONTHS_IT[date.getMonth()]} ${date.getFullYear()}`
 }
 
+function fmtDateShort(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`
+}
+
+function isEventOnDay(event, day) {
+  const d = new Date(day); d.setHours(0,0,0,0)
+  const start = new Date(event.event_date + 'T00:00:00')
+  const end   = event.end_date ? new Date(event.end_date + 'T00:00:00') : start
+  return d >= start && d <= end
+}
+
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
   useEffect(() => {
@@ -108,7 +120,9 @@ function EventChip({ event, isOwner, onEdit }) {
   return (
     <div style={{ backgroundColor: color+'22', border:`1px solid ${color}`, borderRadius:'4px', padding:'1px 5px', fontSize:'0.65rem', color, fontWeight:'600', lineHeight:'1.6', display:'flex', alignItems:'center', gap:'3px', overflow:'hidden' }}>
       <span style={{ flexShrink:0 }}>{emoji}</span>
-      <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{event.title}</span>
+      <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>
+        {event.title}{event.end_date && event.end_date !== event.event_date ? ' →' : ''}
+      </span>
       {isOwner && (
         <span onClick={e => { e.stopPropagation(); onEdit(event) }}
           style={{ cursor:'pointer', opacity:0.65, flexShrink:0, fontSize:'0.65rem' }}>✏️</span>
@@ -153,7 +167,11 @@ function EventCard({ event, detailed, isOwner, onEdit }) {
         {times ?? 'Tutto il giorno'}
       </span>
       {detailed && (
-        <span style={{ fontSize:'0.75rem', color: color+'cc', fontWeight:'500' }}>{typeLabel}</span>
+        <span style={{ fontSize:'0.75rem', color: color+'cc', fontWeight:'500' }}>
+          {typeLabel}
+          {event.end_date && event.end_date !== event.event_date &&
+            ` · ${fmtDateShort(event.event_date)} – ${fmtDateShort(event.end_date)}`}
+        </span>
       )}
       {detailed && event.description && (
         <span style={{ fontSize:'0.78rem', color:'#64748b', marginTop:'2px' }}>{event.description}</span>
@@ -196,6 +214,7 @@ function ViewSelector({ view, setView }) {
 // ── Modal aggiungi evento ──────────────────────────────────────
 function AddEventModal({ date, currentUserId, onClose, onSaved }) {
   const [title,       setTitle]       = useState('')
+  const [endDate,     setEndDate]     = useState('')
   const [startTime,   setStartTime]   = useState('')
   const [endTime,     setEndTime]     = useState('')
   const [eventType,   setEventType]   = useState('altro')
@@ -203,16 +222,19 @@ function AddEventModal({ date, currentUserId, onClose, onSaved }) {
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
+  const pad = n => String(n).padStart(2, '0')
+  const startDateStr = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`
+
   async function handleSave() {
     if (!title.trim()) { setError('Il titolo è obbligatorio'); return }
+    if (endDate && endDate < startDateStr) { setError('La data fine non può essere prima della data inizio'); return }
     setSaving(true)
-    const pad = n => String(n).padStart(2, '0')
-    const dateStr = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`
     const { color } = getEventType(eventType)
     const { error: err } = await supabase.from('calendar_events').insert({
       user_id:     currentUserId,
       title:       title.trim(),
-      event_date:  dateStr,
+      event_date:  startDateStr,
+      end_date:    endDate || null,
       start_time:  startTime || null,
       end_time:    endTime   || null,
       event_type:  eventType,
@@ -266,11 +288,22 @@ function AddEventModal({ date, currentUserId, onClose, onSaved }) {
 
         <div style={{ display:'flex', gap:'10px' }}>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Inizio</div>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Data inizio</div>
+            <input type="date" value={startDateStr} disabled style={{ ...inp, opacity:0.5, cursor:'not-allowed' }} />
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Data fine</div>
+            <input type="date" value={endDate} min={startDateStr} onChange={e => setEndDate(e.target.value)} style={inp} />
+          </div>
+        </div>
+
+        <div style={{ display:'flex', gap:'10px' }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Ora inizio</div>
             <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={inp} />
           </div>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Fine</div>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Ora fine</div>
             <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={inp} />
           </div>
         </div>
@@ -299,6 +332,8 @@ function AddEventModal({ date, currentUserId, onClose, onSaved }) {
 // ── Modal modifica evento ──────────────────────────────────────
 function EditEventModal({ event, onClose, onSaved, onDeleted }) {
   const [title,       setTitle]       = useState(event.title)
+  const [startDate,   setStartDate]   = useState(event.event_date ?? '')
+  const [endDate,     setEndDate]     = useState(event.end_date ?? '')
   const [startTime,   setStartTime]   = useState(event.start_time?.slice(0,5) ?? '')
   const [endTime,     setEndTime]     = useState(event.end_time?.slice(0,5) ?? '')
   const [eventType,   setEventType]   = useState(event.event_type ?? 'altro')
@@ -310,10 +345,14 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
 
   async function handleSave() {
     if (!title.trim()) { setError('Il titolo è obbligatorio'); return }
+    if (!startDate)    { setError('La data inizio è obbligatoria'); return }
+    if (endDate && endDate < startDate) { setError('La data fine non può essere prima della data inizio'); return }
     setSaving(true)
     const { color } = getEventType(eventType)
     const { error: err } = await supabase.from('calendar_events').update({
       title:       title.trim(),
+      event_date:  startDate,
+      end_date:    endDate || null,
       start_time:  startTime || null,
       end_time:    endTime   || null,
       event_type:  eventType,
@@ -375,11 +414,22 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
 
         <div style={{ display:'flex', gap:'10px' }}>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Inizio</div>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Data inizio</div>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inp} />
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Data fine</div>
+            <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} style={inp} />
+          </div>
+        </div>
+
+        <div style={{ display:'flex', gap:'10px' }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Ora inizio</div>
             <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={inp} />
           </div>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Fine</div>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Ora fine</div>
             <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={inp} />
           </div>
         </div>
@@ -443,7 +493,7 @@ function MonthView({ year, month, shifts, showShifts, dbEvents, currentUserId, o
   }, [year, month])
 
   function shiftsForDay(day) { return shifts.filter(s => isSameDay(s.date, day)) }
-  function eventsForDay(day) { return dbEvents.filter(e => isSameDay(new Date(e.event_date + 'T00:00:00'), day)) }
+  function eventsForDay(day) { return dbEvents.filter(e => isEventOnDay(e, day)) }
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap: isMobile ? '2px' : '4px' }}>
@@ -502,7 +552,7 @@ function WeekView({ monday, shifts, showShifts, dbEvents, currentUserId, onDayCl
   })
 
   function shiftsForDay(day) { return shifts.filter(s => isSameDay(s.date, day)) }
-  function eventsForDay(day) { return dbEvents.filter(e => isSameDay(new Date(e.event_date + 'T00:00:00'), day)) }
+  function eventsForDay(day) { return dbEvents.filter(e => isEventOnDay(e, day)) }
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:'4px' }}>
@@ -549,7 +599,7 @@ function DayView({ day, shifts, showShifts, dbEvents, currentUserId, onAddEvent,
   const today     = new Date()
   const isToday   = isSameDay(day, today)
   const dayShifts = shifts.filter(s => isSameDay(s.date, day))
-  const dayEvents = dbEvents.filter(e => isSameDay(new Date(e.event_date + 'T00:00:00'), day))
+  const dayEvents = dbEvents.filter(e => isEventOnDay(e, day))
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
