@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { getEventType } from '../utils/eventTypes'
+import { EVENT_TYPES, getEventType } from '../utils/eventTypes'
 
 const MONTHS_IT    = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
 const MONTHS_SHORT = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
@@ -54,10 +54,137 @@ function Toggle({ checked, onChange, label }) {
   )
 }
 
+function AddEventModal({ currentUserId, onClose, onSaved }) {
+  const today = new Date(); today.setHours(0,0,0,0)
+  const todayStr = dateToStr(today)
+
+  const [title,       setTitle]       = useState('')
+  const [startDate,   setStartDate]   = useState(todayStr)
+  const [endDate,     setEndDate]     = useState('')
+  const [startTime,   setStartTime]   = useState('')
+  const [endTime,     setEndTime]     = useState('')
+  const [eventType,   setEventType]   = useState('altro')
+  const [description, setDescription] = useState('')
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState('')
+
+  async function handleSave() {
+    if (!title.trim())   { setError('Il titolo è obbligatorio');           return }
+    if (!startDate)      { setError('La data di inizio è obbligatoria');   return }
+    if (endDate && endDate < startDate) { setError('La data fine non può essere prima della data inizio'); return }
+    setSaving(true)
+    const { color } = getEventType(eventType)
+    const { error: err } = await supabase.from('calendar_events').insert({
+      user_id:     currentUserId,
+      title:       title.trim(),
+      event_date:  startDate,
+      end_date:    endDate || null,
+      start_time:  startTime || null,
+      end_time:    endTime   || null,
+      event_type:  eventType,
+      color,
+      description: description.trim() || null,
+    })
+    setSaving(false)
+    if (err) { setError('Errore: ' + err.message); return }
+    onSaved()
+    onClose()
+  }
+
+  const inp = {
+    background:'#0f172a', border:'1px solid #334155', borderRadius:'8px',
+    padding:'10px 12px', color:'#f1f5f9', fontSize:'0.88rem', outline:'none',
+    width:'100%', boxSizing:'border-box', fontFamily:'inherit',
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.72)', zIndex:1000,
+      display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(5px)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:'16px',
+        padding:'24px 20px', width:'90%', maxWidth:'340px', display:'flex', flexDirection:'column',
+        gap:'14px', boxShadow:'0 24px 60px rgba(0,0,0,0.85)' }}>
+
+        <div style={{ fontSize:'1.05rem', fontWeight:'700', color:'#f1f5f9' }}>+ Nuovo evento</div>
+
+        {/* Tipologia */}
+        <div>
+          <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'6px' }}>Tipologia</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
+            {EVENT_TYPES.map(t => {
+              const selected = eventType === t.id
+              return (
+                <button key={t.id} onClick={() => setEventType(t.id)}
+                  style={{ padding:'10px 8px', borderRadius:'10px',
+                    border: selected ? `2px solid ${t.color}` : '2px solid #334155',
+                    background: selected ? t.color+'22' : '#0f172a',
+                    color: selected ? t.color : '#64748b',
+                    cursor:'pointer', fontWeight:'600', fontSize:'0.82rem',
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:'6px',
+                    transition:'all .15s' }}>
+                  <span>{t.emoji}</span>
+                  <span style={{ whiteSpace:'nowrap' }}>{t.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <input autoFocus value={title} onChange={e => setTitle(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSave()}
+          placeholder="Titolo *" style={inp} />
+
+        <div style={{ display:'flex', gap:'10px' }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Data inizio *</div>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+              style={{ ...inp, borderColor: !startDate ? '#ef4444' : '#334155' }} />
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Data fine</div>
+            <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} style={inp} />
+          </div>
+        </div>
+
+        <div style={{ display:'flex', gap:'10px' }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Ora inizio</div>
+            <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={inp} />
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Ora fine</div>
+            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={inp} />
+          </div>
+        </div>
+
+        <textarea value={description} onChange={e => setDescription(e.target.value)}
+          placeholder="Note (opzionale)" rows={2}
+          style={{ ...inp, resize:'vertical' }} />
+
+        {error && <div style={{ fontSize:'0.8rem', color:'#ef4444' }}>{error}</div>}
+
+        <div style={{ display:'flex', gap:'8px' }}>
+          <button onClick={onClose}
+            style={{ flex:1, padding:'10px', background:'#334155', border:'none', borderRadius:'8px',
+              color:'#94a3b8', fontWeight:'600', cursor:'pointer', fontSize:'0.9rem' }}>
+            Annulla
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            style={{ flex:1, padding:'10px', background:'#1d4ed8', border:'none', borderRadius:'8px',
+              color:'#fff', fontWeight:'600', cursor:'pointer', fontSize:'0.9rem', opacity:saving?0.7:1 }}>
+            {saving ? 'Salvo…' : 'Salva'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function UpcomingEventsSection({ session }) {
   const [onlyMyEvents, setOnlyMyEvents] = useState(true)
   const [events,       setEvents]       = useState([])
   const [loading,      setLoading]      = useState(true)
+  const [showAddModal, setShowAddModal] = useState(false)
 
   const currentUserId = session?.user?.id
 
@@ -114,8 +241,25 @@ export default function UpcomingEventsSection({ session }) {
             Prossimi 3 mesi · {filteredEvents.length} {filteredEvents.length === 1 ? 'evento' : 'eventi'}
           </p>
         </div>
-        <Toggle checked={onlyMyEvents} onChange={setOnlyMyEvents} label="Solo miei" />
+        <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+          <Toggle checked={onlyMyEvents} onChange={setOnlyMyEvents} label="Solo miei" />
+          <button onClick={() => setShowAddModal(true)}
+            style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px',
+              background:'#1d4ed8', border:'none', borderRadius:'10px',
+              color:'#fff', fontWeight:'700', fontSize:'0.82rem', cursor:'pointer',
+              whiteSpace:'nowrap', flexShrink:0 }}>
+            + Evento
+          </button>
+        </div>
       </div>
+
+      {showAddModal && (
+        <AddEventModal
+          currentUserId={session?.user?.id}
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => { setShowAddModal(false); fetchEvents() }}
+        />
+      )}
 
       {/* ── Contenuto ─────────────────────────────────────── */}
       {grouped.length === 0 ? (
