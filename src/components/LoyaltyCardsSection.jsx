@@ -8,7 +8,7 @@ const FORMATS = [
   { id: 'EAN8',    label: 'EAN-8 (8 cifre)' },
 ]
 
-const ACCENT_COLORS = ['#38bdf8','#4ade80','#f59e0b','#f87171','#a78bfa','#fb923c','#34d399','#e879f9']
+const ACCENT_COLORS = ['#38bdf8','#4ade80','#f59e0b','#ff0000','#a78bfa','#fb923c','#34d399','#1e3a8a','#64748b']
 
 // ── Validazione barcode ──────────────────────────────────────────
 function validateBarcode(value, format) {
