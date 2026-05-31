@@ -378,8 +378,9 @@ export default function LoyaltyCardsSection({ session }) {
 
   async function fetchCards() {
     setLoading(true)
-    const { data } = await supabase.from('loyalty_cards').select('*').order('store_name')
-    if (data) setCards(data)
+    const { data, error } = await supabase.from('loyalty_cards').select('*').order('store_name')
+    if (error) console.error('[LoyaltyCards] fetch error:', error)
+    setCards(data ?? [])
     setLoading(false)
   }
 
