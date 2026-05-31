@@ -62,6 +62,42 @@ export default function AdminSection() {
     }
   }
 
+  const [backupState, setBackupState] = useState('idle') // idle | running | done | error
+  const [backupMsg,   setBackupMsg]   = useState('')
+
+  async function handleBackup() {
+    setBackupState('running')
+    setBackupMsg('')
+    try {
+      const tables = ['app_settings', 'calendar_events', 'loyalty_cards']
+      const dump = { exported_at: new Date().toISOString(), tables: {} }
+
+      for (const t of tables) {
+        const { data, error } = await supabase.from(t).select('*')
+        if (error) throw new Error(`${t}: ${error.message}`)
+        dump.tables[t] = data
+      }
+
+      const json = JSON.stringify(dump, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      a.href     = url
+      a.download = `familyhub-backup-${ts}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+
+      const total = Object.values(dump.tables).reduce((s, rows) => s + rows.length, 0)
+      setBackupMsg(`${total} righe esportate`)
+      setBackupState('done')
+      setTimeout(() => setBackupState('idle'), 3000)
+    } catch(e) {
+      setBackupMsg(e.message)
+      setBackupState('error')
+    }
+  }
+
   if (loading) return (
     <div style={{ color:'#64748b', fontSize:'0.9rem', padding:'40px 0', textAlign:'center' }}>
       Caricamento…
@@ -105,6 +141,38 @@ export default function AdminSection() {
           {feedback}
         </div>
       )}
+
+      {/* Sezione backup */}
+      <div style={{ marginTop:'28px' }}>
+        <div style={{ fontSize:'0.72rem', fontWeight:'700', color:'#475569',
+          textTransform:'uppercase', letterSpacing:'1px', marginBottom:'10px' }}>
+          Database
+        </div>
+        <div style={{ backgroundColor:'#0f172a', borderRadius:'10px', padding:'16px 18px',
+          display:'flex', alignItems:'center', justifyContent:'space-between', gap:'16px' }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.95rem', fontWeight:'600', color:'#f1f5f9', marginBottom:'3px' }}>
+              Backup dati
+            </div>
+            <div style={{ fontSize:'0.78rem', color:'#64748b', lineHeight:1.4 }}>
+              Esporta tutte le tabelle in un file JSON con timestamp.
+              {backupMsg && (
+                <span style={{ marginLeft:'8px', color: backupState === 'error' ? '#f87171' : '#4ade80' }}>
+                  {backupMsg}
+                </span>
+              )}
+            </div>
+          </div>
+          <button onClick={handleBackup} disabled={backupState === 'running'}
+            style={{ flexShrink:0, padding:'8px 16px', borderRadius:'8px', border:'none', cursor: backupState === 'running' ? 'wait' : 'pointer',
+              fontWeight:'600', fontSize:'0.85rem',
+              background: backupState === 'error' ? '#7f1d1d' : backupState === 'done' ? '#052e16' : '#1d4ed8',
+              color: backupState === 'error' ? '#fca5a5' : backupState === 'done' ? '#4ade80' : '#fff',
+              opacity: backupState === 'running' ? 0.7 : 1 }}>
+            {backupState === 'running' ? 'Esporto…' : backupState === 'done' ? '✓ Scaricato' : backupState === 'error' ? 'Errore' : '⬇ Scarica'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
