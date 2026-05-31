@@ -200,10 +200,13 @@
                         cellEl.classList.remove('flagged');
                         if (board[r][c].flagged) {
                             cellEl.classList.add('mine-correct');
-                            cellEl.innerText = '🚩'; // Lascia la bandiera se indovinata
+                            cellEl.innerText = '🚩';
+                        } else if (isWin) {
+                            cellEl.classList.add('mine-correct');
+                            cellEl.innerText = '💣';
                         } else {
                             cellEl.classList.add('mine-wrong');
-                            cellEl.innerText = '💣'; // Mostra la bomba se mancata
+                            cellEl.innerText = '💣';
                         }
                     }
                 }
