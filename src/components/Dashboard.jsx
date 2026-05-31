@@ -3,14 +3,16 @@ import { supabase } from '../supabaseClient'
 import GamesSection from './GamesSection'
 import CalendarSection from './CalendarSection'
 import UpcomingEventsSection from './UpcomingEventsSection'
+import LoyaltyCardsSection from './LoyaltyCardsSection'
 import AdminSection from './AdminSection'
 
 const SUPER_USER = 'massimiliano.petra@gmail.com'
 
 const NAV_BASE = [
-  { id: 'games',    icon: '🎮', label: 'Giochi' },
-  { id: 'calendar', icon: '📅', label: 'Calendario' },
-  { id: 'upcoming', icon: '🗓️', label: 'Prossimi' },
+  { id: 'games',   icon: '🎮', label: 'Giochi' },
+  { id: 'calendar',icon: '📅', label: 'Calendario' },
+  { id: 'upcoming',icon: '🗓️', label: 'Prossimi' },
+  { id: 'cards',   icon: '🎫', label: 'Tessere' },
 ]
 
 function useIsMobile() {
@@ -119,6 +121,7 @@ export default function Dashboard({ session }) {
         {section === 'games'    && <GamesSection />}
         {section === 'calendar' && <CalendarSection session={session} />}
         {section === 'upcoming' && <UpcomingEventsSection session={session} />}
+        {section === 'cards'    && <LoyaltyCardsSection session={session} />}
         {section === 'admin'    && isSuperUser && <AdminSection />}
       </main>
     </div>
