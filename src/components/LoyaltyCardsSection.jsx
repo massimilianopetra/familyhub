@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import Barcode from 'react-barcode'
-import QRCode from 'react-qr-code'
+import QRCodeLib from 'qrcode'
 
 const FORMATS = [
   { id: 'CODE128',  label: 'Code 128 (generico)' },
@@ -44,6 +44,33 @@ function validationError(value, format) {
 }
 
 // ── Rendering barcode / QR sicuro ────────────────────────────────
+function QRDisplay({ value, size }) {
+  const canvasRef = useRef(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!canvasRef.current || !value) return
+    QRCodeLib.toCanvas(canvasRef.current, value, {
+      width: size,
+      margin: 2,
+      color: { dark: '#111217', light: '#ffffff' },
+    }).catch(e => {
+      setError(String(e))
+    })
+  }, [value, size])
+
+  if (error) {
+    return (
+      <div style={{ padding:'12px', color:'#ef4444', fontSize:'0.75rem', textAlign:'center' }}>
+        QR error: {error}<br/>
+        <span style={{ fontSize:'0.65rem', color:'#94a3b8', wordBreak:'break-all' }}>{value}</span>
+      </div>
+    )
+  }
+  return <canvas ref={canvasRef} style={{ display:'block' }} />
+}
+
+
 function BarcodeDisplay({ value, format, large = false }) {
   if (!validateBarcode(value, format)) {
     return (
@@ -54,7 +81,7 @@ function BarcodeDisplay({ value, format, large = false }) {
   }
   if (format === 'QR_CODE') {
     const size = large ? 180 : 110
-    return <QRCode value={value} size={size} bgColor="#ffffff" fgColor="#111217" />
+    return <QRDisplay value={value} size={size} />
   }
   return (
     <Barcode
@@ -329,7 +356,7 @@ function CardModal({ card, onClose, onSaved, onDeleted }) {
 // ── Vista fullscreen per scansione ───────────────────────────────
 function FullscreenCard({ card, onClose }) {
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.92)', zIndex:2000, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'20px', backdropFilter:'blur(8px)', cursor:'pointer' }}
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.96)', zIndex:2000, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'20px', cursor:'pointer' }}
       onClick={onClose}>
       <div style={{ fontSize:'1.6rem', fontWeight:'800', color:card.color, textAlign:'center', padding:'0 20px' }}>
         {card.store_name}
@@ -360,7 +387,7 @@ function LoyaltyCard({ card, isOwner, onEdit, onClick }) {
   return (
     <div onClick={onClick}
       style={{ background:card.color, borderRadius:'16px', padding:'28px 16px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:`0 6px 24px ${card.color}55`, minHeight:'90px', position:'relative' }}>
-      <div style={{ fontWeight:'800', fontSize:'1.5rem', color:textColor, textAlign:'center', lineHeight:1.2, padding:'0 32px', wordBreak:'break-word' }}>
+      <div style={{ fontWeight:'800', fontSize:'1.1rem', color:textColor, textAlign:'center', lineHeight:1.2, padding:'0 28px', wordBreak:'break-word' }}>
         {card.store_name}
       </div>
       {isOwner && (
@@ -432,17 +459,23 @@ export default function LoyaltyCardsSection({ session }) {
       )}
 
       {!loading && filtered.length > 0 && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:'16px' }}>
-          {filtered.map(card => (
-            <LoyaltyCard
-              key={card.id}
-              card={card}
-              isOwner={card.user_id === currentUserId}
-              onEdit={setEditCard}
-              onClick={() => setFullscreenCard(card)}
-            />
-          ))}
-        </div>
+        <>
+          <style>{`
+            .loyalty-grid { display:grid; gap:12px; grid-template-columns:repeat(2,1fr); }
+            @media(min-width:600px){ .loyalty-grid { grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; } }
+          `}</style>
+          <div className="loyalty-grid">
+            {filtered.map(card => (
+              <LoyaltyCard
+                key={card.id}
+                card={card}
+                isOwner={card.user_id === currentUserId}
+                onEdit={setEditCard}
+                onClick={() => setFullscreenCard(card)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {addModal && (
