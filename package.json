@@ -14,7 +14,8 @@
     "@supabase/supabase-js": "^2.106.2",
     "react": "^19.2.6",
     "react-barcode": "^1.6.1",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "react-qr-code": "^2.0.21"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

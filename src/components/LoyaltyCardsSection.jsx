@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import Barcode from 'react-barcode'
+import QRCode from 'react-qr-code'
 
 const FORMATS = [
-  { id: 'CODE128', label: 'Code 128 (generico)' },
-  { id: 'EAN13',   label: 'EAN-13 (13 cifre)' },
-  { id: 'EAN8',    label: 'EAN-8 (8 cifre)' },
+  { id: 'CODE128',  label: 'Code 128 (generico)' },
+  { id: 'EAN13',    label: 'EAN-13 (13 cifre)' },
+  { id: 'EAN8',     label: 'EAN-8 (8 cifre)' },
+  { id: 'QR_CODE',  label: 'QR Code' },
 ]
 
 const ACCENT_COLORS = ['#38bdf8','#4ade80','#f59e0b','#ff0000','#a78bfa','#fb923c','#34d399','#1e3a8a','#64748b']
@@ -41,7 +43,7 @@ function validationError(value, format) {
   return null
 }
 
-// ── Rendering barcode sicuro ─────────────────────────────────────
+// ── Rendering barcode / QR sicuro ────────────────────────────────
 function BarcodeDisplay({ value, format, large = false }) {
   if (!validateBarcode(value, format)) {
     return (
@@ -49,6 +51,10 @@ function BarcodeDisplay({ value, format, large = false }) {
         Codice non valido
       </div>
     )
+  }
+  if (format === 'QR_CODE') {
+    const size = large ? 180 : 110
+    return <QRCode value={value} size={size} bgColor="#ffffff" fgColor="#111217" />
   }
   return (
     <Barcode
@@ -82,8 +88,9 @@ const SCAN_FORMAT_MAP = {
   ean_13: 'EAN13', ean_8: 'EAN8',
   upc_a: 'EAN13', upc_e: 'EAN8',
   code_128: 'CODE128', code_39: 'CODE128', itf: 'CODE128',
+  qr_code: 'QR_CODE',
 }
-const SCAN_FORMATS = ['ean_13', 'ean_8', 'code_128', 'code_39', 'itf', 'upc_a', 'upc_e']
+const SCAN_FORMATS = ['ean_13', 'ean_8', 'code_128', 'code_39', 'itf', 'upc_a', 'upc_e', 'qr_code']
 const DETECTOR_SUPPORTED = 'BarcodeDetector' in window
 
 // ── Modal aggiungi / modifica ────────────────────────────────────
@@ -335,28 +342,29 @@ function FullscreenCard({ card, onClose }) {
   )
 }
 
+// ── Colore testo contrastante rispetto allo sfondo ───────────────
+function contrastColor(hex) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5 ? '#1e293b' : '#ffffff'
+}
+
 // ── Card singola tessera ─────────────────────────────────────────
 function LoyaltyCard({ card, isOwner, onEdit, onClick }) {
+  const textColor = contrastColor(card.color)
   return (
     <div onClick={onClick}
-      style={{ background:'#1e293b', border:`1px solid ${card.color}55`, borderRadius:'16px', padding:'16px', display:'flex', flexDirection:'column', gap:'10px', cursor:'pointer', boxShadow:`0 4px 20px ${card.color}18` }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px' }}>
-        <div style={{ fontWeight:'700', fontSize:'1rem', color:card.color, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>
-          {card.store_name}
-        </div>
-        {isOwner && (
-          <button onClick={e => { e.stopPropagation(); onEdit(card) }}
-            style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer', fontSize:'0.85rem', padding:'2px 6px', lineHeight:1, flexShrink:0 }}>
-            ✏️
-          </button>
-        )}
+      style={{ background:card.color, borderRadius:'16px', padding:'28px 16px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:`0 6px 24px ${card.color}55`, minHeight:'90px', position:'relative' }}>
+      <div style={{ fontWeight:'800', fontSize:'1.5rem', color:textColor, textAlign:'center', lineHeight:1.2, padding:'0 32px', wordBreak:'break-word' }}>
+        {card.store_name}
       </div>
-      <div style={{ background:'#fff', borderRadius:'8px', padding:'6px', display:'flex', justifyContent:'center', overflow:'hidden' }}>
-        <BarcodeDisplay value={card.barcode_value} format={card.barcode_format} />
-      </div>
-      <div style={{ fontSize:'0.72rem', color:'#64748b', textAlign:'center', fontFamily:'monospace', letterSpacing:'1px' }}>
-        {card.barcode_value}
-      </div>
+      {isOwner && (
+        <button onClick={e => { e.stopPropagation(); onEdit(card) }}
+          style={{ position:'absolute', top:'8px', right:'8px', background:'rgba(0,0,0,0.18)', border:'none', borderRadius:'6px', color:textColor, cursor:'pointer', fontSize:'0.85rem', padding:'4px 6px', lineHeight:1 }}>
+          ✏️
+        </button>
+      )}
     </div>
   )
 }
