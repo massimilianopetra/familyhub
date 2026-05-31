@@ -132,7 +132,11 @@ function CardModal({ card, onClose, onSaved, onDeleted }) {
             const results = await detector.detect(videoRef.current)
             if (results.length > 0) {
               const r = results[0]
-              setBarcodeVal(r.rawValue)
+              // UPC-A è EAN-13 senza lo zero iniziale — lo reintegriamo
+              const rawVal = r.format === 'upc_a' && r.rawValue.length === 12
+                ? '0' + r.rawValue
+                : r.rawValue
+              setBarcodeVal(rawVal)
               setBarcodeFormat(SCAN_FORMAT_MAP[r.format] ?? 'CODE128')
               setError('')
               setScanning(false)
