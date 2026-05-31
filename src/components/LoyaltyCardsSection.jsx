@@ -87,7 +87,7 @@ const SCAN_FORMATS = ['ean_13', 'ean_8', 'code_128', 'code_39', 'itf', 'upc_a', 
 const DETECTOR_SUPPORTED = 'BarcodeDetector' in window
 
 // ── Modal aggiungi / modifica ────────────────────────────────────
-function CardModal({ card, currentUserId, onClose, onSaved, onDeleted }) {
+function CardModal({ card, onClose, onSaved, onDeleted }) {
   const isEdit = !!card
   const [storeName,     setStoreName]     = useState(card?.store_name     ?? '')
   const [barcodeVal,    setBarcodeVal]    = useState(card?.barcode_value   ?? '')
@@ -156,17 +156,19 @@ function CardModal({ card, currentUserId, onClose, onSaved, onDeleted }) {
     if (bcErr) { setError(bcErr); return }
 
     setSaving(true)
+
     const payload = {
       store_name:     storeName.trim(),
       barcode_value:  barcodeVal.trim(),
       barcode_format: barcodeFormat,
       color,
     }
+
     let err
     if (isEdit) {
       ;({ error: err } = await supabase.from('loyalty_cards').update(payload).eq('id', card.id))
     } else {
-      ;({ error: err } = await supabase.from('loyalty_cards').insert({ ...payload, user_id: currentUserId }))
+      ;({ error: err } = await supabase.from('loyalty_cards').insert(payload))
     }
     setSaving(false)
     if (err) { setError('Errore: ' + err.message); return }
@@ -432,7 +434,6 @@ export default function LoyaltyCardsSection({ session }) {
 
       {addModal && (
         <CardModal
-          currentUserId={currentUserId}
           onClose={() => setAddModal(false)}
           onSaved={fetchCards}
         />
@@ -440,7 +441,6 @@ export default function LoyaltyCardsSection({ session }) {
       {editCard && (
         <CardModal
           card={editCard}
-          currentUserId={currentUserId}
           onClose={() => setEditCard(null)}
           onSaved={fetchCards}
           onDeleted={removeCard}
