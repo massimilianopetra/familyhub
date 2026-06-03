@@ -180,11 +180,159 @@ function AddEventModal({ currentUserId, onClose, onSaved }) {
   )
 }
 
+function EditEventModal({ event, onClose, onSaved, onDeleted }) {
+  const [title,       setTitle]       = useState(event.title)
+  const [startDate,   setStartDate]   = useState(event.event_date ?? '')
+  const [endDate,     setEndDate]     = useState(event.end_date ?? '')
+  const [startTime,   setStartTime]   = useState(event.start_time?.slice(0,5) ?? '')
+  const [endTime,     setEndTime]     = useState(event.end_time?.slice(0,5) ?? '')
+  const [eventType,   setEventType]   = useState(event.event_type ?? 'altro')
+  const [description, setDescription] = useState(event.description ?? '')
+  const [saving,      setSaving]      = useState(false)
+  const [deleting,    setDeleting]    = useState(false)
+  const [confirmDel,  setConfirmDel]  = useState(false)
+  const [error,       setError]       = useState('')
+
+  async function handleSave() {
+    if (!title.trim()) { setError('Il titolo è obbligatorio'); return }
+    if (!startDate)    { setError('La data inizio è obbligatoria'); return }
+    if (endDate && endDate < startDate) { setError('La data fine non può essere prima della data inizio'); return }
+    setSaving(true)
+    const { color } = getEventType(eventType)
+    const { error: err } = await supabase.from('calendar_events').update({
+      title:       title.trim(),
+      event_date:  startDate,
+      end_date:    endDate || null,
+      start_time:  startTime || null,
+      end_time:    endTime   || null,
+      event_type:  eventType,
+      color,
+      description: description.trim() || null,
+    }).eq('id', event.id)
+    setSaving(false)
+    if (err) { setError('Errore: ' + err.message); return }
+    onSaved()
+    onClose()
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    const { error: err } = await supabase.from('calendar_events').delete().eq('id', event.id)
+    setDeleting(false)
+    if (err) { setError('Errore: ' + err.message); return }
+    onDeleted(event.id)
+    onClose()
+  }
+
+  const inp = {
+    background:'#0f172a', border:'1px solid #334155', borderRadius:'8px',
+    padding:'10px 12px', color:'#f1f5f9', fontSize:'0.88rem', outline:'none',
+    width:'100%', boxSizing:'border-box', fontFamily:'inherit',
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.72)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(5px)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:'#1e293b', border:'1px solid #334155', borderRadius:'16px', padding:'24px 20px', width:'90%', maxWidth:'340px', display:'flex', flexDirection:'column', gap:'14px', boxShadow:'0 24px 60px rgba(0,0,0,0.85)' }}>
+        <div style={{ fontSize:'1.05rem', fontWeight:'700', color:'#f1f5f9' }}>✏️ Modifica evento</div>
+
+        <div>
+          <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'6px' }}>Tipologia</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' }}>
+            {EVENT_TYPES.map(t => {
+              const selected = eventType === t.id
+              return (
+                <button key={t.id} onClick={() => setEventType(t.id)}
+                  style={{ padding:'10px 8px', borderRadius:'10px', border: selected ? `2px solid ${t.color}` : '2px solid #334155',
+                    background: selected ? t.color+'22' : '#0f172a',
+                    color: selected ? t.color : '#64748b',
+                    cursor:'pointer', fontWeight:'600', fontSize:'0.82rem',
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:'6px',
+                    transition:'all .15s' }}>
+                  <span>{t.emoji}</span>
+                  <span style={{ whiteSpace:'nowrap' }}>{t.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <input value={title} onChange={e => setTitle(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSave()}
+          placeholder="Titolo *" style={inp} />
+
+        <div style={{ display:'flex', gap:'10px' }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Data inizio</div>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inp} />
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Data fine</div>
+            <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} style={inp} />
+          </div>
+        </div>
+
+        <div style={{ display:'flex', gap:'10px' }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Ora inizio</div>
+            <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={inp} />
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:'0.72rem', color:'#64748b', marginBottom:'4px' }}>Ora fine</div>
+            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={inp} />
+          </div>
+        </div>
+
+        <textarea value={description} onChange={e => setDescription(e.target.value)}
+          placeholder="Note (opzionale)" rows={2}
+          style={{ ...inp, resize:'vertical' }} />
+
+        {error && <div style={{ fontSize:'0.8rem', color:'#ef4444' }}>{error}</div>}
+
+        <div style={{ display:'flex', gap:'8px' }}>
+          <button onClick={onClose}
+            style={{ flex:1, padding:'10px', background:'#334155', border:'none', borderRadius:'8px', color:'#94a3b8', fontWeight:'600', cursor:'pointer', fontSize:'0.9rem' }}>
+            Annulla
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            style={{ flex:1, padding:'10px', background:'#1d4ed8', border:'none', borderRadius:'8px', color:'#fff', fontWeight:'600', cursor:'pointer', fontSize:'0.9rem', opacity:saving?0.7:1 }}>
+            {saving ? 'Salvo…' : 'Salva'}
+          </button>
+        </div>
+
+        <div style={{ borderTop:'1px solid #334155', paddingTop:'12px' }}>
+          {!confirmDel ? (
+            <button onClick={() => setConfirmDel(true)}
+              style={{ width:'100%', padding:'8px', background:'none', border:'1px solid #7f1d1d', borderRadius:'8px', color:'#f87171', fontWeight:'600', cursor:'pointer', fontSize:'0.85rem' }}>
+              🗑 Elimina evento
+            </button>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+              <div style={{ fontSize:'0.8rem', color:'#f87171', textAlign:'center' }}>Sei sicuro? L'operazione è irreversibile.</div>
+              <div style={{ display:'flex', gap:'8px' }}>
+                <button onClick={() => setConfirmDel(false)}
+                  style={{ flex:1, padding:'8px', background:'#334155', border:'none', borderRadius:'8px', color:'#94a3b8', fontWeight:'600', cursor:'pointer', fontSize:'0.85rem' }}>
+                  Annulla
+                </button>
+                <button onClick={handleDelete} disabled={deleting}
+                  style={{ flex:1, padding:'8px', background:'#7f1d1d', border:'none', borderRadius:'8px', color:'#fca5a5', fontWeight:'600', cursor:'pointer', fontSize:'0.85rem', opacity:deleting?0.7:1 }}>
+                  {deleting ? 'Elimino…' : 'Sì, elimina'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function UpcomingEventsSection({ session }) {
   const [onlyMyEvents, setOnlyMyEvents] = useState(true)
   const [events,       setEvents]       = useState([])
   const [loading,      setLoading]      = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editModal,    setEditModal]    = useState(null)
 
   const currentUserId = session?.user?.id
 
@@ -205,6 +353,10 @@ export default function UpcomingEventsSection({ session }) {
 
     setEvents(data ?? [])
     setLoading(false)
+  }
+
+  function deleteEvent(id) {
+    setEvents(prev => prev.filter(e => e.id !== id))
   }
 
   const filteredEvents = useMemo(() =>
@@ -260,6 +412,14 @@ export default function UpcomingEventsSection({ session }) {
           onSaved={() => { setShowAddModal(false); fetchEvents() }}
         />
       )}
+      {editModal && (
+        <EditEventModal
+          event={editModal}
+          onClose={() => setEditModal(null)}
+          onSaved={() => { setEditModal(null); fetchEvents() }}
+          onDeleted={deleteEvent}
+        />
+      )}
 
       {/* ── Contenuto ─────────────────────────────────────── */}
       {grouped.length === 0 ? (
@@ -313,7 +473,7 @@ export default function UpcomingEventsSection({ session }) {
                       opacity: isOwn ? 1 : 0.82,
                     }}>
 
-                      {/* Riga 1: tipo + badge + famiglia */}
+                      {/* Riga 1: tipo + badge + famiglia + modifica */}
                       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px' }}>
                         <span style={{ fontSize:'0.75rem', color: isOwn ? color : color+'aa', fontWeight:'700', display:'flex', alignItems:'center', gap:'4px' }}>
                           {emoji} {typeLabel}
@@ -336,6 +496,12 @@ export default function UpcomingEventsSection({ session }) {
                           }}>
                             {badge.text}
                           </span>
+                          {isOwn && (
+                            <button onClick={() => setEditModal(event)}
+                              style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:'0.85rem', padding:'0 2px', lineHeight:1, flexShrink:0 }}>
+                              ✏️
+                            </button>
+                          )}
                         </div>
                       </div>
 
