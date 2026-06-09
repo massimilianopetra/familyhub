@@ -302,7 +302,7 @@ function triggerAI() {
         aiThinking = false;
         if (move) { makeMove(move[0], move[1]); }
         else { currentPlayer = 1; updateHud(); setMsg('Computer non ha mosse — tocca a te!', true); render(); }
-    }, 80);
+    }, 2000);
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
