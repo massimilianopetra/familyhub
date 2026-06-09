@@ -587,7 +587,7 @@ function closeModal() { document.getElementById('confirmModal').classList.remove
 function confirmNewGame(){ closeModal(); initGame(); }
 document.getElementById('confirmModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
-gameMode='2p'; showReasoning=true;
+gameMode='2p'; showReasoning=false;
 initGame();
 </script>
 </body>
