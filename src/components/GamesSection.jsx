@@ -373,6 +373,8 @@ const GAMES = [
   { id: 'yahtzee',     icon: '🎲', title: 'Yahtzee',       desc: 'Lancia 5 dadi per le migliori combinazioni!',          color: '#9b59b6' },
   { id: 'minesweeper', icon: '💣', title: 'Minesweeper',   desc: 'Scopri le celle senza far esplodere le mine.',         color: '#6b7280' },
   { id: 'sudoku',      icon: '🔢', title: 'Sudoku',        desc: 'Riempi la griglia 9×9 senza ripetizioni.',             color: '#0ea5e9' },
+  { id: 'blackjack',   icon: '🃏', title: 'Blackjack',     desc: 'Punta al 21 senza sforare: batti il banco!',           color: '#16a34a' },
+  { id: 'mancala',     icon: '🪨', title: 'Mancala',       desc: 'Antico gioco di strategia: svuota il lato avversario.',color: '#b45309' },
 ]
 
 export default function GamesSection() {
@@ -384,6 +386,8 @@ export default function GamesSection() {
   if (active === 'yahtzee')    return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/yatzee.html`}       title="Yahtzee"      icon="🎲" />
   if (active === 'minesweeper')return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/mInesweeper.html`} title="Minesweeper"  icon="💣" />
   if (active === 'sudoku')     return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/sodku.html`}        title="Sudoku"       icon="🔢" />
+  if (active === 'blackjack')  return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/blackjack.html`}    title="Blackjack"    icon="🃏" />
+  if (active === 'mancala')    return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/mancala.html`}      title="Mancala"      icon="🪨" />
 
   return (
     <div style={homeS.wrapper}>
