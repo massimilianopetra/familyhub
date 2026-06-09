@@ -243,6 +243,11 @@
         .board::-webkit-scrollbar { width: 6px; }
         .board::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
         .board::-webkit-scrollbar-thumb { background: #44475a; border-radius: 3px; }
+
+        .rules-toggle { text-align: center; margin-top: 12px; }
+        .rules-toggle button { background: none; border: 1px solid #44475a; color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
+        .rules-box { display: none; margin-top: 6px; background: #111217; border-radius: 6px; padding: 10px; font-size: 0.7rem; color: #a0a2b1; line-height: 1.6; }
+        .rules-box strong { color: #f4f4f6; }
     </style>
 </head>
 <body>
@@ -291,9 +296,21 @@
         </div>
 
         <div class="status-message" id="status-msg"></div>
+
+        <div class="rules-toggle">
+            <button onclick="toggleRules()">📖 Regole</button>
+            <div class="rules-box" id="rules-box">
+                <strong>Obiettivo:</strong> indovinare il codice segreto di 4 colori in 10 tentativi.<br><br>
+                <strong>I colori si ripetono:</strong> lo stesso colore può comparire più volte nel codice.<br><br>
+                <strong>Piolo nero:</strong> colore giusto nella posizione giusta.<br>
+                <strong>Piolo bianco:</strong> colore giusto, posizione sbagliata.<br><br>
+                <strong>Conferma:</strong> completa tutti e 4 gli slot, poi premi Conferma. Clicca un piolo già inserito per svuotarlo.
+            </div>
+        </div>
     </div>
 
     <script>
+        function toggleRules() { const rb = document.getElementById('rules-box'); rb.style.display = rb.style.display === 'block' ? 'none' : 'block'; }
         const MAX_ATTEMPTS = 10;
         const CODE_LENGTH = 4;
         

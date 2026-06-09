@@ -62,6 +62,11 @@
         .modal-btn:hover { opacity: 0.88; }
         .modal-btn-cancel  { background: var(--hidden); color: var(--text); }
         .modal-btn-confirm { background: var(--error);  color: #fff; }
+
+        .rules-toggle { text-align: center; margin-top: 10px; }
+        .rules-toggle button { background: none; border: 1px solid var(--hidden); color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
+        .rules-box { display: none; margin-top: 6px; background: var(--empty); border-radius: 6px; padding: 10px; font-size: 0.7rem; color: #a0a2b1; line-height: 1.6; }
+        .rules-box strong { color: var(--text); }
     </style>
 </head>
 <body>
@@ -101,6 +106,16 @@
         </div>
 
         <button class="btn-reset" onclick="askNewGame()">Nuova Partita</button>
+
+        <div class="rules-toggle">
+            <button onclick="toggleRules()">📖 Regole</button>
+            <div class="rules-box" id="rules-box">
+                <strong>Obiettivo:</strong> riempire la griglia 9×9 con i numeri da 1 a 9.<br><br>
+                <strong>Regola:</strong> ogni numero deve comparire esattamente una volta per riga, per colonna e per ogni riquadro 3×3.<br><br>
+                <strong>Celle azzurre:</strong> numeri fissi, non modificabili. <strong>Celle rosse:</strong> conflitto rilevato.<br><br>
+                <strong>Tastierino:</strong> tocca una cella vuota, poi premi il numero. ❌ per cancellare. I tasti si disabilitano quando un numero è già completo (9 volte).
+            </div>
+        </div>
     </div>
 
     <div id="confirmModal" class="modal-overlay">
@@ -268,6 +283,8 @@
         document.getElementById('confirmModal').addEventListener('click', function(e) {
             if (e.target === this) closeModal();
         });
+
+        function toggleRules() { const rb = document.getElementById('rules-box'); rb.style.display = rb.style.display === 'block' ? 'none' : 'block'; }
 
         initGame();
     </script>

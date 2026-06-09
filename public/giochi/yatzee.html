@@ -334,6 +334,11 @@
         .modal-btn:hover  { opacity: 0.88; }
         .modal-btn-cancel  { background: #44475a; color: #f4f4f6; }
         .modal-btn-confirm { background: #ff5555; color: #fff; }
+
+        .rules-toggle { text-align: center; margin-top: 12px; }
+        .rules-toggle button { background: none; border: 1px solid #44475a; color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
+        .rules-box { display: none; margin-top: 6px; background: #16171d; border-radius: 6px; padding: 10px; font-size: 0.7rem; color: #a0a2b1; line-height: 1.6; }
+        .rules-box strong { color: #f4f4f6; }
     </style>
 </head>
 <body>
@@ -384,9 +389,25 @@
         <div class="scoreboard" id="score-table-target"></div>
 
         <div class="status-message" id="status-text"></div>
+
+        <div class="rules-toggle">
+            <button onclick="toggleRules()">📖 Regole</button>
+            <div class="rules-box" id="rules-box">
+                <strong>Obiettivo:</strong> massimizzare il punteggio compilando le 13 categorie del tabellone.<br><br>
+                <strong>Turno:</strong> fino a 3 lanci. Dopo il primo puoi tenere i dadi desiderati (clic per bloccarli, in giallo). Al termine devi scegliere una categoria.<br><br>
+                <strong>Sezione numeri (1–6):</strong> somma solo i dadi del numero scelto. Bonus +35 pt se il totale ≥ 63.<br>
+                <strong>Tris / Poker:</strong> 3 o 4 dadi uguali — punteggio = somma di tutti e 5.<br>
+                <strong>Full:</strong> tre uguali + due uguali — vale sempre 25 pt.<br>
+                <strong>Scala piccola:</strong> 4 numeri consecutivi — 30 pt.<br>
+                <strong>Scala grande:</strong> 5 numeri consecutivi — 40 pt.<br>
+                <strong>Yahtzee:</strong> tutti e 5 uguali — 50 pt. Yahtzee multipli: +100 pt ciascuno.<br>
+                <strong>Chance:</strong> somma libera di tutti i dadi, sempre valida.
+            </div>
+        </div>
     </div>
 
     <script>
+        function toggleRules() { const rb = document.getElementById('rules-box'); rb.style.display = rb.style.display === 'block' ? 'none' : 'block'; }
         const CATEGORIES = {
             ones: "1 (Assi)", twos: "2 (Due)", threes: "3 (Tre)", fours: "4 (Quattro)", fives: "5 (Cinque)", sixes: "6 (Sei)",
             threeOfAKind: "Tris", fourOfAKind: "Poker", fullHouse: "Full (25 pt)", smallStraight: "Scala Piccola (30 pt)", largeStraight: "Scala Grande (40 pt)",

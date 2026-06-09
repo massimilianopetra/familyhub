@@ -62,6 +62,11 @@
         .modal-btn:hover  { opacity: 0.88; }
         .modal-btn-cancel  { background: #44475a; color: #f4f4f6; }
         .modal-btn-confirm { background: #ff5555; color: #fff; }
+
+        .rules-toggle { text-align: center; margin-top: 12px; }
+        .rules-toggle button { background: none; border: 1px solid var(--hidden); color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
+        .rules-box { display: none; margin-top: 6px; background: var(--empty); border-radius: 6px; padding: 10px; font-size: 0.7rem; color: #a0a2b1; line-height: 1.6; }
+        .rules-box strong { color: var(--text); }
     </style>
 </head>
 <body>
@@ -86,6 +91,18 @@
         <div class="action-buttons">
             <button id="btn-check" class="action" onclick="checkVictoryManually()">Verifica Mappa</button>
             <button id="btn-reset" class="action" onclick="askNewGame()">Nuova Partita</button>
+        </div>
+
+        <div class="rules-toggle">
+            <button onclick="toggleRules()">📖 Regole</button>
+            <div class="rules-box" id="rules-box">
+                <strong>Obiettivo:</strong> scoprire tutte le celle senza mine (griglia 9×9, 10 mine).<br><br>
+                <strong>Scava:</strong> rivela una cella. Se è una mina — Game Over!<br>
+                <strong>Numero:</strong> indica quante mine circondano quella cella (fino a 8).<br>
+                <strong>Cella vuota:</strong> si espande automaticamente alle adiacenti.<br><br>
+                <strong>Segnala 🚩:</strong> marca una cella dove sospetti una mina. Su desktop: tasto destro del mouse.<br><br>
+                <strong>Verifica Mappa:</strong> controlla se le bandiere corrispondono esattamente alle mine per dichiarare la vittoria.
+            </div>
         </div>
     </div>
 
@@ -212,6 +229,8 @@
                 }
             }
         }
+
+        function toggleRules() { const rb = document.getElementById('rules-box'); rb.style.display = rb.style.display === 'block' ? 'none' : 'block'; }
 
         function askNewGame() {
             document.getElementById('confirmModal').classList.add('active');
