@@ -133,6 +133,11 @@
         .touch-btn:active { background: var(--accent-color); }
         .span-2 { grid-column: span 2; }
 
+        .rules-toggle { text-align: center; margin-top: 12px; width: 100%; max-width: 320px; }
+        .rules-toggle button { background: none; border: 1px solid #44475a; color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
+        .rules-box { display: none; margin-top: 6px; background: #1a1a2e; border-radius: 6px; padding: 10px; font-size: 0.7rem; color: #a0a2b1; line-height: 1.6; text-align: left; }
+        .rules-box strong { color: #e2e8f0; }
+
         @media (max-width: 480px) {
             .game-wrapper { padding: 10px; gap: 10px; }
             #tetris { width: 200px; height: 400px; }
@@ -178,7 +183,19 @@
         <div class="touch-btn" onclick="moveDown()">▼</div>
     </div>
 
+    <div class="rules-toggle">
+        <button onclick="toggleRules()">📖 Regole</button>
+        <div class="rules-box" id="rules-box">
+            <strong>Obiettivo:</strong> completare linee orizzontali per guadagnare punti ed evitare che i pezzi raggiungano la cima.<br><br>
+            <strong>Linee:</strong> ogni linea completa viene eliminata. Più linee in un colpo — più punti (punteggio raddoppia).<br><br>
+            <strong>Livello:</strong> ogni 100 punti il livello sale e i pezzi scendono più veloci.<br><br>
+            <strong>Controlli tastiera:</strong> ◀▶ muovi, ↑ / W ruota, ↓ / S scendi, Spazio caduta istantanea.<br>
+            <strong>Touch:</strong> usa i pulsanti qui sopra.
+        </div>
+    </div>
+
     <script>
+        function toggleRules() { const rb = document.getElementById('rules-box'); rb.style.display = rb.style.display === 'block' ? 'none' : 'block'; }
         const canvas = document.getElementById('tetris');
         const context = canvas.getContext('2d');
         const nextCanvas = document.getElementById('nextPieceCanvas');

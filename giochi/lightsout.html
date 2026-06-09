@@ -163,6 +163,11 @@
         }
         
         .win { color: #50fa7b; }
+
+        .rules-toggle { text-align: center; margin-top: 12px; }
+        .rules-toggle button { background: none; border: 1px solid #44475a; color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
+        .rules-box { display: none; margin-top: 6px; background: #111217; border-radius: 6px; padding: 10px; font-size: 0.7rem; color: #a0a2b1; line-height: 1.6; }
+        .rules-box strong { color: #f4f4f6; }
     </style>
 </head>
 <body>
@@ -190,9 +195,20 @@
 
         <!-- Messaggio di Vittoria finale -->
         <div class="status-message" id="status-text"></div>
+
+        <div class="rules-toggle">
+            <button onclick="toggleRules()">📖 Regole</button>
+            <div class="rules-box" id="rules-box">
+                <strong>Obiettivo:</strong> spegnere tutte le 25 luci della griglia 5×5.<br><br>
+                <strong>Click su una cella:</strong> inverte lo stato di quella cella e delle 4 adiacenti (sopra, sotto, sinistra, destra). Le celle agli angoli o ai bordi invertono meno celle.<br><br>
+                <strong>Livelli garantiti:</strong> ogni partita è sempre risolvibile — il livello viene generato applicando mosse casuali in senso inverso.<br><br>
+                <strong>Annulla:</strong> il pulsante Annulla permette di tornare indietro di una mossa alla volta.
+            </div>
+        </div>
     </div>
 
     <script>
+        function toggleRules() { const rb = document.getElementById('rules-box'); rb.style.display = rb.style.display === 'block' ? 'none' : 'block'; }
         const GRID_SIZE = 5;
         let board = [];       // Matrice 5x5 che tiene traccia dello stato (true = accesa, false = spenta)
         let moveHistory = []; // Stack per gestire la cronologia dei click (Undo)
