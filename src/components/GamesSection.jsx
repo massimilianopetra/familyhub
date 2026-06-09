@@ -375,6 +375,7 @@ const GAMES = [
   { id: 'sudoku',      icon: '🔢', title: 'Sudoku',        desc: 'Riempi la griglia 9×9 senza ripetizioni.',             color: '#0ea5e9' },
   { id: 'blackjack',   icon: '🃏', title: 'Blackjack',     desc: 'Punta al 21 senza sforare: batti il banco!',           color: '#16a34a' },
   { id: 'mancala',     icon: '🪨', title: 'Mancala',       desc: 'Antico gioco di strategia: svuota il lato avversario.',color: '#b45309' },
+  { id: 'othello',     icon: '⚫', title: 'Othello',       desc: 'Conquista la scacchiera capovolgendo le pedine.',      color: '#7c3aed' },
 ]
 
 export default function GamesSection() {
@@ -388,6 +389,7 @@ export default function GamesSection() {
   if (active === 'sudoku')     return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/sodku.html`}        title="Sudoku"       icon="🔢" />
   if (active === 'blackjack')  return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/blackjack.html`}    title="Blackjack"    icon="🃏" />
   if (active === 'mancala')    return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/mancala.html`}      title="Mancala"      icon="🪨" />
+  if (active === 'othello')    return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/othello.html`}      title="Othello"      icon="⚫" />
 
   return (
     <div style={homeS.wrapper}>

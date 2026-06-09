@@ -42,12 +42,35 @@ Raccolta di giochi classici ottimizzati per mobile, con tema dark retro.
 
 | Gioco | Descrizione |
 |---|---|
-| **Sudoku** | Griglia 9×9 con tre difficoltà. Tastierino numerico integrato. Popup di conferma prima di iniziare una nuova partita. |
-| **Lights Out** | Puzzle 5×5: spegni tutte le luci. Premendo una cella si invertono lei e le adiacenti. |
-| **Campo Minato** | Minesweeper classico 9×9 con 10 mine. Su mobile modalità ⛏️ Scava / 🚩 Segnala. |
-| **Yahtzee Arcade** | Gioco di dadi per uno o più giocatori, fino a 3 lanci per round. |
-| **Tetris** | Classico Tetris arcade con velocità crescente. |
 | **Mastermind** | 6 colori, 10 tentativi, segnali bianco/nero. |
+| **Tetris** | Classico Tetris arcade con velocità crescente. |
+| **Lights Out** | Puzzle 5×5: spegni tutte le luci. Premendo una cella si invertono lei e le adiacenti. |
+| **Yahtzee Arcade** | Gioco di dadi per uno o più giocatori, fino a 3 lanci per round. |
+| **Campo Minato** | Minesweeper classico 9×9 con 10 mine. Su mobile modalità ⛏️ Scava / 🚩 Segnala. |
+| **Sudoku** | Griglia 9×9 con tre difficoltà. Tastierino numerico integrato. Popup di conferma prima di iniziare una nuova partita. |
+| **Blackjack** | Gioco contro il banco con puntate, raddoppio e statistica crediti. Mazzo singolo da 52 carte persistente tra le mani (rimescolato automaticamente sotto le 15 carte residue). |
+| **Mancala** | Antico gioco africano dei semi. Modalità 2 giocatori o vs Computer. Animazione seme per seme, annulla mossa, velocità regolabile. |
+| **Othello** | Classico Reversi su griglia 8×8. Modalità 2 giocatori o vs Computer. Animazione flip delle pedine catturate, caselle valide evidenziate. |
+
+#### 🤖 Intelligenza artificiale nei giochi
+
+**Mancala — AI greedy con look-ahead a 2 livelli**
+
+Il computer valuta ogni mossa disponibile assegnando un punteggio basato su:
+- differenza di semi nel proprio magazzino rispetto all'avversario;
+- bonus per le mosse che garantiscono un **turno extra** (ultimo seme nel magazzino);
+- bonus per le mosse di **cattura** (ultimo seme in buca vuota con buca opposta non vuota);
+- per le mosse con turno extra, valutazione ricorsiva della migliore mossa successiva (look-ahead +1).
+
+**Othello — Minimax con Alpha-Beta pruning, profondità 4**
+
+L'algoritmo **minimax** esplora l'albero delle mosse fino a 4 livelli di profondità, simulando sia le mosse del computer (massimizza) sia quelle dell'avversario (minimizza). La potatura **alpha-beta** elimina i rami che non possono migliorare il risultato già trovato, riducendo drasticamente il numero di posizioni valutate senza perdere qualità di gioco.
+
+La funzione di valutazione usa una **matrice di pesi posizionali** 8×8:
+- Gli **angoli** (valore 120) sono la posizione più forte: una volta occupati non possono essere ripresi.
+- I **bordi** hanno valore medio-alto perché limitano le mosse avversarie.
+- Le **celle adiacenti agli angoli** hanno valore negativo (−20/−40): occuparle prima di controllare l'angolo regala spesso l'angolo all'avversario.
+- Il centro ha valore basso nelle prime fasi; la valutazione posizionale è dominante rispetto al semplice conteggio delle pedine.
 
 ### ⚙️ Pannello Admin *(solo super user)*
 
