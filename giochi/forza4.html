@@ -237,7 +237,7 @@ function animateDrop(col, row, player, callback) {
     var startY = MARGIN + CELL/2;
     var endY = cellCY(row);
     var dist = endY - startY;
-    var dur = Math.max(0.22, Math.min(0.65, 0.15 + dist/600));
+    var dur = Math.max(0.45, Math.min(1.2, 0.3 + dist/300));
 
     var piece = makeSVGEl('circle', {
         cx: cx, cy: startY, r: CHECKER_R,
