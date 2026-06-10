@@ -64,6 +64,15 @@
         #btn-endturn { background: var(--hidden); color: var(--text); }
         #btn-reset   { background: #ff5555; color: #fff; flex: none; padding: 9px 13px; }
 
+        /* log mosse: ultimo turno per ciascun giocatore */
+        .move-log-wrap { background: var(--empty); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 4px; }
+        .move-log-title { font-size: 0.65rem; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        .move-log-row { font-size: 0.7rem; padding: 3px 6px; border-radius: 4px; display: flex; align-items: baseline; gap: 6px; color: #a0a2b1; background: rgba(255,255,255,0.03); }
+        .move-log-row .lp { font-weight: bold; flex-shrink: 0; }
+        .move-log-row.p1 .lp { color: var(--p1); }
+        .move-log-row.p2 .lp { color: var(--p2); }
+        .move-log-row .lm { flex: 1; word-break: break-word; }
+
         /* regole */
         .rules-toggle { text-align: center; margin-top: 6px; }
         .rules-toggle button { background: none; border: 1px solid var(--hidden); color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
@@ -134,6 +143,12 @@
         <button class="action" id="btn-reset" onclick="askReset()">&#8635; Nuova</button>
     </div>
 
+    <div class="move-log-wrap">
+        <div class="move-log-title">📜 Ultime mosse</div>
+        <div class="move-log-row p1"><span class="lp" id="move-log-label1">P1</span><span class="lm" id="move-log-p1">—</span></div>
+        <div class="move-log-row p2"><span class="lp" id="move-log-label2">P2</span><span class="lm" id="move-log-p2">—</span></div>
+    </div>
+
     <div class="rules-toggle"><button onclick="toggleRules()">📖 Regole</button></div>
     <div class="rules-box" id="rules-box">
         <strong>Obiettivo:</strong> portare tutte le 15 pedine nella propria casa e poi toglierle dal gioco.<br>
@@ -198,6 +213,7 @@ var selected = null;    // indice punto selezionato (o 'bar')
 var validMoves = [];    // [{from, to}]
 var gameOver = false;
 var aiThinking = false;
+var turnLog = [[], []]; // mosse dell'ultimo/turno corrente di ciascun giocatore: turnLog[player] = [testo, ...]
 
 function initState() {
     // Posizione iniziale standard backgammon
@@ -711,6 +727,7 @@ function doMove(from, to) {
         state.points[from] -= sign;
     }
 
+    var hit = false;
     if (to === 'off') {
         state.borneOff[p]++;
     } else {
@@ -719,6 +736,7 @@ function doMove(from, to) {
         if (state.points[to] === opp) {
             state.points[to] = 0;
             state.bar[1-p]++;
+            hit = true;
         }
         state.points[to] += sign;
     }
@@ -731,6 +749,11 @@ function doMove(from, to) {
     var idx = dice.indexOf(dieUsed);
     if (idx >= 0) dice.splice(idx, 1);
     else dice.splice(0, 1); // fallback
+
+    // Registra la mossa nel log dell'ultimo turno di questo giocatore
+    var logText = fromLabel + ' → ' + toLabel + ' (dado ' + dieUsed + ')' + (hit ? ' 🎯' : '');
+    turnLog[p].push(logText);
+    renderMoveLog();
 
     updatePipcount();
     checkWin();
@@ -783,6 +806,10 @@ function rollDice() {
     var d2 = Math.floor(Math.random()*6)+1;
     rawDice = [d1, d2];
     dice = (d1 === d2) ? [d1, d1, d1, d1] : [d1, d2];
+
+    // Nuovo turno: azzera il log delle mosse precedenti di questo giocatore
+    turnLog[currentPlayer] = [];
+    renderMoveLog();
 
     // Mostra dadi
     var dieEls = ['die1','die2','die3','die4'];
@@ -929,6 +956,13 @@ function setMsg(txt, type) {
     el.className = 'message-bar' + (type ? ' ' + type : '');
 }
 
+function renderMoveLog() {
+    document.getElementById('move-log-label1').textContent = 'P1';
+    document.getElementById('move-log-label2').textContent = gameMode==='ai' ? 'CPU' : 'P2';
+    document.getElementById('move-log-p1').textContent = turnLog[0].length ? turnLog[0].join('  ·  ') : '—';
+    document.getElementById('move-log-p2').textContent = turnLog[1].length ? turnLog[1].join('  ·  ') : '—';
+}
+
 function setMode(m) {
     gameMode = m;
     document.getElementById('mode-2p').className = 'btn-mode' + (m==='2p'?' active':'');
@@ -955,6 +989,8 @@ function confirmReset() {
         el.textContent='-'; el.className='die';
         el.style.display= i<2?'flex':'none';
     });
+    turnLog = [[], []];
+    renderMoveLog();
     updatePipcount();
     setMsg('Premi Lancia Dadi per iniziare. Turno di P1 (Blu).');
     drawBoard();
@@ -968,6 +1004,7 @@ function toggleRules() {
 // ── START ─────────────────────────────────────────────────────────────────────
 state = initState();
 updatePipcount();
+renderMoveLog();
 drawBoard();
 </script>
 </body>
