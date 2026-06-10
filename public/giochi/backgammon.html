@@ -673,8 +673,11 @@ function moveDest(from, die, player) {
         }
         var to = from - die;
         if (to < 0) {
-            // Bear off
-            if (allInHome(player)) return 'off';
+            // Bear off: dado esatto sempre ok; dado in eccesso solo se non
+            // ci sono pedine su punti più alti (più lontani dall'uscita)
+            if (!allInHome(player)) return null;
+            var dist = from + 1;
+            if (die === dist || !hasCheckerBeyond(player, from)) return 'off';
             return null;
         }
         return isValidDest(to, player) ? to : null;
@@ -687,7 +690,11 @@ function moveDest(from, die, player) {
         }
         var to = from + die;
         if (to > 23) {
-            if (allInHome(player)) return 'off';
+            // Bear off: dado esatto sempre ok; dado in eccesso solo se non
+            // ci sono pedine su punti più alti (più lontani dall'uscita)
+            if (!allInHome(player)) return null;
+            var dist = 24 - from;
+            if (die === dist || !hasCheckerBeyond(player, from)) return 'off';
             return null;
         }
         return isValidDest(to, player) ? to : null;
@@ -698,6 +705,17 @@ function isValidDest(ptIdx, player) {
     var cnt = state.points[ptIdx];
     if (player === 0) return cnt >= -1; // libero o mio o blot avversario
     return cnt <= 1;
+}
+
+// Vero se il giocatore ha ancora pedine su punti più alti (più lontani
+// dall'uscita) rispetto a ptIdx, all'interno della propria casa
+function hasCheckerBeyond(player, ptIdx) {
+    if (player === 0) {
+        for (var i = ptIdx + 1; i <= 5; i++) if (state.points[i] > 0) return true;
+    } else {
+        for (var i = 18; i < ptIdx; i++) if (state.points[i] < 0) return true;
+    }
+    return false;
 }
 
 function allInHome(player) {
