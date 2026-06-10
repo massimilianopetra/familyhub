@@ -64,16 +64,14 @@
         #btn-endturn { background: var(--hidden); color: var(--text); }
         #btn-reset   { background: #ff5555; color: #fff; flex: none; padding: 9px 13px; }
 
-        /* log mosse */
-        .move-log-wrap { background: var(--empty); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; }
-        .move-log-title { font-size: 0.65rem; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-        .move-log { max-height: 78px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-        .move-log-entry { font-size: 0.7rem; padding: 2px 5px; border-radius: 4px; display: flex; justify-content: space-between; gap: 6px; color: #a0a2b1; background: rgba(255,255,255,0.03); }
-        .move-log-entry .lp { font-weight: bold; flex-shrink: 0; }
-        .move-log-entry.p1 .lp { color: var(--p1); }
-        .move-log-entry.p2 .lp { color: var(--p2); }
-        .move-log-entry .lm { flex: 1; text-align: right; }
-        .move-log-empty { font-size: 0.7rem; color: #64748b; text-align: center; padding: 4px; }
+        /* log mosse: ultimo turno per ciascun giocatore */
+        .move-log-wrap { background: var(--empty); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 4px; }
+        .move-log-title { font-size: 0.65rem; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        .move-log-row { font-size: 0.7rem; padding: 3px 6px; border-radius: 4px; display: flex; align-items: baseline; gap: 6px; color: #a0a2b1; background: rgba(255,255,255,0.03); }
+        .move-log-row .lp { font-weight: bold; flex-shrink: 0; }
+        .move-log-row.p1 .lp { color: var(--p1); }
+        .move-log-row.p2 .lp { color: var(--p2); }
+        .move-log-row .lm { flex: 1; word-break: break-word; }
 
         /* regole */
         .rules-toggle { text-align: center; margin-top: 6px; }
@@ -146,8 +144,9 @@
     </div>
 
     <div class="move-log-wrap">
-        <div class="move-log-title">📜 Mosse</div>
-        <div class="move-log" id="move-log"></div>
+        <div class="move-log-title">📜 Ultime mosse</div>
+        <div class="move-log-row p1"><span class="lp" id="move-log-label1">P1</span><span class="lm" id="move-log-p1">—</span></div>
+        <div class="move-log-row p2"><span class="lp" id="move-log-label2">P2</span><span class="lm" id="move-log-p2">—</span></div>
     </div>
 
     <div class="rules-toggle"><button onclick="toggleRules()">📖 Regole</button></div>
@@ -214,7 +213,7 @@ var selected = null;    // indice punto selezionato (o 'bar')
 var validMoves = [];    // [{from, to}]
 var gameOver = false;
 var aiThinking = false;
-var moveLog = [];       // storico mosse: {player, text}
+var turnLog = [[], []]; // mosse dell'ultimo/turno corrente di ciascun giocatore: turnLog[player] = [testo, ...]
 
 function initState() {
     // Posizione iniziale standard backgammon
@@ -751,11 +750,9 @@ function doMove(from, to) {
     if (idx >= 0) dice.splice(idx, 1);
     else dice.splice(0, 1); // fallback
 
-    // Registra la mossa nel log
-    var shortName = p === 0 ? 'P1' : (gameMode==='ai' ? 'CPU' : 'P2');
-    var logText = fromLabel + ' → ' + toLabel + ' (dado ' + dieUsed + ')' + (hit ? ' — colpita pedina avversaria!' : '');
-    moveLog.unshift({ player: p, text: logText, label: shortName });
-    if (moveLog.length > 40) moveLog.length = 40;
+    // Registra la mossa nel log dell'ultimo turno di questo giocatore
+    var logText = fromLabel + ' → ' + toLabel + ' (dado ' + dieUsed + ')' + (hit ? ' 🎯' : '');
+    turnLog[p].push(logText);
     renderMoveLog();
 
     updatePipcount();
@@ -809,6 +806,10 @@ function rollDice() {
     var d2 = Math.floor(Math.random()*6)+1;
     rawDice = [d1, d2];
     dice = (d1 === d2) ? [d1, d1, d1, d1] : [d1, d2];
+
+    // Nuovo turno: azzera il log delle mosse precedenti di questo giocatore
+    turnLog[currentPlayer] = [];
+    renderMoveLog();
 
     // Mostra dadi
     var dieEls = ['die1','die2','die3','die4'];
@@ -956,28 +957,10 @@ function setMsg(txt, type) {
 }
 
 function renderMoveLog() {
-    var el = document.getElementById('move-log');
-    el.innerHTML = '';
-    if (moveLog.length === 0) {
-        var empty = document.createElement('div');
-        empty.className = 'move-log-empty';
-        empty.textContent = 'Nessuna mossa ancora.';
-        el.appendChild(empty);
-        return;
-    }
-    moveLog.forEach(function(entry) {
-        var row = document.createElement('div');
-        row.className = 'move-log-entry ' + (entry.player === 0 ? 'p1' : 'p2');
-        var lp = document.createElement('span');
-        lp.className = 'lp';
-        lp.textContent = entry.label;
-        var lm = document.createElement('span');
-        lm.className = 'lm';
-        lm.textContent = entry.text;
-        row.appendChild(lp);
-        row.appendChild(lm);
-        el.appendChild(row);
-    });
+    document.getElementById('move-log-label1').textContent = 'P1';
+    document.getElementById('move-log-label2').textContent = gameMode==='ai' ? 'CPU' : 'P2';
+    document.getElementById('move-log-p1').textContent = turnLog[0].length ? turnLog[0].join('  ·  ') : '—';
+    document.getElementById('move-log-p2').textContent = turnLog[1].length ? turnLog[1].join('  ·  ') : '—';
 }
 
 function setMode(m) {
@@ -1006,7 +989,7 @@ function confirmReset() {
         el.textContent='-'; el.className='die';
         el.style.display= i<2?'flex':'none';
     });
-    moveLog = [];
+    turnLog = [[], []];
     renderMoveLog();
     updatePipcount();
     setMsg('Premi Lancia Dadi per iniziare. Turno di P1 (Blu).');
