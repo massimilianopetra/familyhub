@@ -237,20 +237,27 @@ function animateDrop(col, row, player, callback) {
     var startY = MARGIN + CELL/2;
     var endY = cellCY(row);
     var dist = endY - startY;
-    var dur = Math.max(0.45, Math.min(1.2, 0.3 + dist/300));
+    var dur = Math.max(400, Math.min(1100, 350 + dist*2)); // ms
 
     var piece = makeSVGEl('circle', {
         cx: cx, cy: startY, r: CHECKER_R,
         fill: player===0 ? C_P1 : C_P2, stroke: 'rgba(0,0,0,0.25)', 'stroke-width': '2'
     });
-    var anim = makeSVGEl('animate', {
-        attributeName: 'cy', values: startY+';'+endY, keyTimes: '0;1',
-        dur: dur+'s', fill: 'freeze', calcMode: 'spline', keySplines: '0.55 0.085 0.68 0.53'
-    });
-    piece.appendChild(anim);
     svg.appendChild(piece);
 
-    setTimeout(callback, dur*1000 + 30);
+    var startTime = null;
+    function step(ts) {
+        if (startTime === null) startTime = ts;
+        var t = Math.min(1, (ts - startTime) / dur);
+        var eased = t * t; // accelerazione tipo gravità
+        piece.setAttribute('cy', startY + (endY - startY) * eased);
+        if (t < 1) {
+            requestAnimationFrame(step);
+        } else {
+            callback();
+        }
+    }
+    requestAnimationFrame(step);
 }
 
 // ── LOGICA DI GIOCO ───────────────────────────────────────────────────────────
