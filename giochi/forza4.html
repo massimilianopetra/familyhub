@@ -161,7 +161,7 @@ var ROWS=6, COLS=7;
 var W=380, H=380, MARGIN=15, CELL=50;
 var BOARD_X=MARGIN, BOARD_Y=MARGIN+CELL;
 var BOARD_W=COLS*CELL, BOARD_H=ROWS*CELL;
-var HOLE_R=21, CHECKER_R=20;
+var HOLE_R=21;
 
 var C_FRAME='#1c5fae', C_EMPTY='#111217';
 var C_P1='#e74c3c', C_P2='#f1c40f', C_WIN='#2ecc71';
@@ -198,7 +198,7 @@ function makeSVGEl(tag, attrs) {
 }
 
 // ── DISEGNO ───────────────────────────────────────────────────────────────────
-function drawBoard(skip, winCells) {
+function drawBoard(winCells) {
     var svg = document.getElementById('c4-svg');
     svg.innerHTML = '';
 
@@ -207,13 +207,12 @@ function drawBoard(skip, winCells) {
     for (var r=0; r<ROWS; r++) {
         for (var c=0; c<COLS; c++) {
             var val = grid[r][c];
-            var isSkip = skip && skip.row===r && skip.col===c;
             var fill = C_EMPTY;
-            if (val===1 && !isSkip) fill = C_P1;
-            else if (val===2 && !isSkip) fill = C_P2;
+            if (val===1) fill = C_P1;
+            else if (val===2) fill = C_P2;
             svg.appendChild(makeSVGEl('circle', {
                 cx: cellCX(c), cy: cellCY(r), r: HOLE_R, fill: fill,
-                stroke: (val && !isSkip) ? 'rgba(0,0,0,0.25)' : 'none', 'stroke-width': '2'
+                stroke: val ? 'rgba(0,0,0,0.25)' : 'none', 'stroke-width': '2'
             }));
         }
     }
@@ -230,34 +229,7 @@ function drawBoard(skip, winCells) {
 }
 
 function animateDrop(col, row, player, callback) {
-    var svg = document.getElementById('c4-svg');
-    drawBoard({row:row, col:col});
-
-    var cx = cellCX(col);
-    var startY = MARGIN + CELL/2;
-    var endY = cellCY(row);
-    var dist = endY - startY;
-    var dur = Math.max(400, Math.min(1100, 350 + dist*2)); // ms
-
-    var piece = makeSVGEl('circle', {
-        cx: cx, cy: startY, r: CHECKER_R,
-        fill: player===0 ? C_P1 : C_P2, stroke: 'rgba(0,0,0,0.25)', 'stroke-width': '2'
-    });
-    svg.appendChild(piece);
-
-    var startTime = null;
-    function step(ts) {
-        if (startTime === null) startTime = ts;
-        var t = Math.min(1, (ts - startTime) / dur);
-        var eased = t * t; // accelerazione tipo gravità
-        piece.setAttribute('cy', startY + (endY - startY) * eased);
-        if (t < 1) {
-            requestAnimationFrame(step);
-        } else {
-            callback();
-        }
-    }
-    requestAnimationFrame(step);
+    setTimeout(callback, 350);
 }
 
 // ── LOGICA DI GIOCO ───────────────────────────────────────────────────────────
@@ -316,7 +288,7 @@ function afterMove(col, row) {
     renderMoveLog();
 
     if (win) {
-        drawBoard(null, win);
+        drawBoard(win);
         gameOver = true;
         if (player === 0) score.p1++; else score.p2++;
         updateScore();
