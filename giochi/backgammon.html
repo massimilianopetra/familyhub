@@ -64,6 +64,17 @@
         #btn-endturn { background: var(--hidden); color: var(--text); }
         #btn-reset   { background: #ff5555; color: #fff; flex: none; padding: 9px 13px; }
 
+        /* log mosse */
+        .move-log-wrap { background: var(--empty); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; }
+        .move-log-title { font-size: 0.65rem; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+        .move-log { max-height: 78px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+        .move-log-entry { font-size: 0.7rem; padding: 2px 5px; border-radius: 4px; display: flex; justify-content: space-between; gap: 6px; color: #a0a2b1; background: rgba(255,255,255,0.03); }
+        .move-log-entry .lp { font-weight: bold; flex-shrink: 0; }
+        .move-log-entry.p1 .lp { color: var(--p1); }
+        .move-log-entry.p2 .lp { color: var(--p2); }
+        .move-log-entry .lm { flex: 1; text-align: right; }
+        .move-log-empty { font-size: 0.7rem; color: #64748b; text-align: center; padding: 4px; }
+
         /* regole */
         .rules-toggle { text-align: center; margin-top: 6px; }
         .rules-toggle button { background: none; border: 1px solid var(--hidden); color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
@@ -134,6 +145,11 @@
         <button class="action" id="btn-reset" onclick="askReset()">&#8635; Nuova</button>
     </div>
 
+    <div class="move-log-wrap">
+        <div class="move-log-title">📜 Mosse</div>
+        <div class="move-log" id="move-log"></div>
+    </div>
+
     <div class="rules-toggle"><button onclick="toggleRules()">📖 Regole</button></div>
     <div class="rules-box" id="rules-box">
         <strong>Obiettivo:</strong> portare tutte le 15 pedine nella propria casa e poi toglierle dal gioco.<br>
@@ -198,6 +214,7 @@ var selected = null;    // indice punto selezionato (o 'bar')
 var validMoves = [];    // [{from, to}]
 var gameOver = false;
 var aiThinking = false;
+var moveLog = [];       // storico mosse: {player, text}
 
 function initState() {
     // Posizione iniziale standard backgammon
@@ -711,6 +728,7 @@ function doMove(from, to) {
         state.points[from] -= sign;
     }
 
+    var hit = false;
     if (to === 'off') {
         state.borneOff[p]++;
     } else {
@@ -719,6 +737,7 @@ function doMove(from, to) {
         if (state.points[to] === opp) {
             state.points[to] = 0;
             state.bar[1-p]++;
+            hit = true;
         }
         state.points[to] += sign;
     }
@@ -731,6 +750,13 @@ function doMove(from, to) {
     var idx = dice.indexOf(dieUsed);
     if (idx >= 0) dice.splice(idx, 1);
     else dice.splice(0, 1); // fallback
+
+    // Registra la mossa nel log
+    var shortName = p === 0 ? 'P1' : (gameMode==='ai' ? 'CPU' : 'P2');
+    var logText = fromLabel + ' → ' + toLabel + ' (dado ' + dieUsed + ')' + (hit ? ' — colpita pedina avversaria!' : '');
+    moveLog.unshift({ player: p, text: logText, label: shortName });
+    if (moveLog.length > 40) moveLog.length = 40;
+    renderMoveLog();
 
     updatePipcount();
     checkWin();
@@ -929,6 +955,31 @@ function setMsg(txt, type) {
     el.className = 'message-bar' + (type ? ' ' + type : '');
 }
 
+function renderMoveLog() {
+    var el = document.getElementById('move-log');
+    el.innerHTML = '';
+    if (moveLog.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'move-log-empty';
+        empty.textContent = 'Nessuna mossa ancora.';
+        el.appendChild(empty);
+        return;
+    }
+    moveLog.forEach(function(entry) {
+        var row = document.createElement('div');
+        row.className = 'move-log-entry ' + (entry.player === 0 ? 'p1' : 'p2');
+        var lp = document.createElement('span');
+        lp.className = 'lp';
+        lp.textContent = entry.label;
+        var lm = document.createElement('span');
+        lm.className = 'lm';
+        lm.textContent = entry.text;
+        row.appendChild(lp);
+        row.appendChild(lm);
+        el.appendChild(row);
+    });
+}
+
 function setMode(m) {
     gameMode = m;
     document.getElementById('mode-2p').className = 'btn-mode' + (m==='2p'?' active':'');
@@ -955,6 +1006,8 @@ function confirmReset() {
         el.textContent='-'; el.className='die';
         el.style.display= i<2?'flex':'none';
     });
+    moveLog = [];
+    renderMoveLog();
     updatePipcount();
     setMsg('Premi Lancia Dadi per iniziare. Turno di P1 (Blu).');
     drawBoard();
@@ -968,6 +1021,7 @@ function toggleRules() {
 // ── START ─────────────────────────────────────────────────────────────────────
 state = initState();
 updatePipcount();
+renderMoveLog();
 drawBoard();
 </script>
 </body>
