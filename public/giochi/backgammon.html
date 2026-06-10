@@ -232,6 +232,13 @@ function initState() {
 
 function isTop(ptIdx) { return ptIdx >= 12; }
 
+// Riquadro di evidenziazione per un punto: solo la metà (alta o bassa) dove si trova la punta
+function pointHighlightRect(ptIdx) {
+    return isTop(ptIdx)
+        ? { y: BOARD_Y+2, height: BOARD_H/2-2 }
+        : { y: BOARD_Y+BOARD_H/2, height: BOARD_H/2-2 };
+}
+
 // ── RENDERING SVG ─────────────────────────────────────────────────────────────
 function makeSVGEl(tag, attrs) {
     var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -385,9 +392,10 @@ function drawSelection(svg) {
         // niente sfondo colonna, l'anello sulla pedina basta
     } else {
         var cx = pointXCenter(selected);
+        var hr = pointHighlightRect(selected);
         svg.appendChild(makeSVGEl('rect', {
-            x: cx-POINT_W/2+2, y: BOARD_Y+2,
-            width: POINT_W-4, height: BOARD_H-4,
+            x: cx-POINT_W/2+2, y: hr.y,
+            width: POINT_W-4, height: hr.height,
             rx: 4, fill: 'rgba(241,196,15,0.12)', 'pointer-events':'none'
         }));
     }
@@ -450,10 +458,11 @@ function drawSelection(svg) {
             svg.appendChild(ot);
         } else {
             var dcx = pointXCenter(d);
+            var dhr = pointHighlightRect(d);
             // Sfondo destinazione
             svg.appendChild(makeSVGEl('rect', {
-                x: dcx-POINT_W/2+2, y: BOARD_Y+2,
-                width: POINT_W-4, height: BOARD_H-4,
+                x: dcx-POINT_W/2+2, y: dhr.y,
+                width: POINT_W-4, height: dhr.height,
                 rx: 4, fill: 'rgba(241,196,15,0.35)', 'pointer-events':'none'
             }));
             // Pallino destinazione al centro della colonna
