@@ -377,6 +377,7 @@ const GAMES = [
   { id: 'mancala',     icon: '🪨', title: 'Mancala',       desc: 'Antico gioco di strategia: svuota il lato avversario.',color: '#b45309' },
   { id: 'othello',     icon: '⚫', title: 'Othello',       desc: 'Conquista la scacchiera capovolgendo le pedine.',      color: '#7c3aed' },
   { id: 'backgammon',  icon: '▲▽', title: 'Backgammon',    desc: 'Sposta le pedine e porta tutte a casa per primo.',     color: '#0d9488' },
+  { id: 'forza4',      icon: '🟡', title: 'Forza 4',       desc: 'Allinea 4 pedine in fila prima del tuo avversario.',   color: '#2563eb' },
 ]
 
 export default function GamesSection() {
@@ -392,6 +393,7 @@ export default function GamesSection() {
   if (active === 'mancala')    return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/mancala.html`}      title="Mancala"      icon="🪨" />
   if (active === 'othello')    return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/othello.html`}      title="Othello"      icon="⚫" />
   if (active === 'backgammon') return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/backgammon.html`}   title="Backgammon"   icon="▲▽" />
+  if (active === 'forza4')     return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/forza4.html`}       title="Forza 4"      icon="🟡" />
 
   return (
     <div style={homeS.wrapper}>
