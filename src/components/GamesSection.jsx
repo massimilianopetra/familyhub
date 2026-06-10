@@ -376,6 +376,7 @@ const GAMES = [
   { id: 'blackjack',   icon: '🃏', title: 'Blackjack',     desc: 'Punta al 21 senza sforare: batti il banco!',           color: '#16a34a' },
   { id: 'mancala',     icon: '🪨', title: 'Mancala',       desc: 'Antico gioco di strategia: svuota il lato avversario.',color: '#b45309' },
   { id: 'othello',     icon: '⚫', title: 'Othello',       desc: 'Conquista la scacchiera capovolgendo le pedine.',      color: '#7c3aed' },
+  { id: 'backgammon',  icon: '🎯', title: 'Backgammon',    desc: 'Sposta le pedine e porta tutte a casa per primo.',     color: '#0d9488' },
 ]
 
 export default function GamesSection() {
@@ -390,6 +391,7 @@ export default function GamesSection() {
   if (active === 'blackjack')  return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/blackjack.html`}    title="Blackjack"    icon="🃏" />
   if (active === 'mancala')    return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/mancala.html`}      title="Mancala"      icon="🪨" />
   if (active === 'othello')    return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/othello.html`}      title="Othello"      icon="⚫" />
+  if (active === 'backgammon') return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/backgammon.html`}   title="Backgammon"   icon="🎯" />
 
   return (
     <div style={homeS.wrapper}>

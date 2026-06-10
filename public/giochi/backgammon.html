@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Backgammon</title>
+    <style>
+        :root {
+            --bg: #1e1e24; --panel: #2a2b36; --text: #f4f4f6; --empty: #111217;
+            --hidden: #44475a; --revealed: #21222c;
+            --p1: #3498db; --p2: #2ecc71; --accent: #f1c40f;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size: 1rem; }
+        .subtitle { margin-bottom: 6px; color: #a0a2b1; font-size: 0.7rem; }
+        .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 420px; }
+
+        /* top controls */
+        .top-controls { display: flex; gap: 5px; margin-bottom: 6px; }
+        .btn-mode { flex: 1; padding: 6px 4px; border: 2px solid var(--hidden); border-radius: 6px; background: var(--empty); color: #a0a2b1; font-weight: bold; font-size: 0.7rem; cursor: pointer; transition: all 0.15s; }
+        .btn-mode.active { border-color: var(--accent); color: var(--accent); background: #1e1c00; }
+
+        /* hud */
+        .hud { display: flex; justify-content: space-between; align-items: center; background: var(--empty); padding: 5px 10px; border-radius: 6px; margin-bottom: 5px; font-weight: bold; font-size: 0.75rem; }
+        .hud-player { display: flex; align-items: center; gap: 5px; }
+        .hud-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+        /* score strip */
+        .score-strip { display: flex; gap: 5px; margin-bottom: 5px; }
+        .score-chip { flex: 1; background: var(--empty); border-radius: 5px; padding: 4px 6px; text-align: center; font-size: 0.65rem; color: #a0a2b1; }
+        .score-chip span { display: block; font-size: 0.9rem; font-weight: bold; color: var(--text); }
+
+        /* message */
+        .message-bar { background: var(--empty); border-radius: 5px; padding: 4px 8px; font-size: 0.7rem; color: #a0a2b1; text-align: center; margin-bottom: 5px; min-height: 24px; display: flex; align-items: center; justify-content: center; }
+        .message-bar.highlight { color: var(--accent); font-weight: bold; }
+        .message-bar.win { color: var(--p2); font-weight: bold; }
+        .message-bar.lose { color: #ff5555; font-weight: bold; }
+
+        /* dadi */
+        .dice-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+        .die {
+            width: 36px; height: 36px; background: var(--revealed);
+            border: 2px solid var(--hidden); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; font-weight: bold; color: var(--text);
+            transition: all 0.15s;
+        }
+        .die.used { opacity: 0.3; border-color: #333; }
+        .die.p1c { border-color: var(--p1); color: var(--p1); }
+        .die.p2c { border-color: var(--p2); color: var(--p2); }
+        .btn-roll { flex: 1; padding: 8px; border: none; border-radius: 6px; background: var(--accent); color: #111; font-weight: bold; font-size: 0.82rem; cursor: pointer; transition: opacity 0.15s; }
+        .btn-roll:disabled { opacity: 0.35; cursor: default; }
+
+        /* tabellone SVG */
+        .board-wrap { background: var(--empty); border-radius: 8px; padding: 6px; margin-bottom: 6px; overflow: hidden; }
+        #bg-svg { width: 100%; height: auto; display: block; }
+
+        /* pulsante fine turno */
+        .action-buttons { display: flex; gap: 5px; margin-bottom: 6px; }
+        .action { flex: 1; padding: 9px 4px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.78rem; transition: opacity 0.15s, transform 0.1s; }
+        .action:active:not(:disabled) { transform: scale(0.95); }
+        .action:disabled { opacity: 0.35; cursor: default; }
+        #btn-endturn { background: var(--hidden); color: var(--text); }
+        #btn-reset   { background: #ff5555; color: #fff; flex: none; padding: 9px 13px; }
+
+        /* regole */
+        .rules-toggle { text-align: center; margin-top: 6px; }
+        .rules-toggle button { background: none; border: 1px solid var(--hidden); color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
+        .rules-box { display: none; margin-top: 6px; background: var(--empty); border-radius: 6px; padding: 10px; font-size: 0.7rem; color: #a0a2b1; line-height: 1.6; }
+        .rules-box strong { color: var(--text); }
+
+        /* modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: #2a2b36; border: 1px solid #44475a; border-radius: 18px; padding: 28px 22px; max-width: 300px; width: 88%; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.85); animation: modalPop 0.2s cubic-bezier(0.34,1.56,0.64,1); }
+        @keyframes modalPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 8px; }
+        .modal-body  { font-size: 0.78rem; color: #a0a2b1; margin-bottom: 18px; line-height: 1.5; }
+        .modal-btns  { display: flex; gap: 10px; justify-content: center; }
+        .modal-btn   { flex: 1; max-width: 110px; padding: 10px; border: none; border-radius: 8px; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
+        .modal-btn.confirm { background: #ff5555; color: #fff; }
+        .modal-btn.cancel  { background: var(--hidden); color: var(--text); }
+    </style>
+</head>
+<body>
+
+<h1>Backgammon</h1>
+<p class="subtitle">gioco da tavolo classico</p>
+
+<div class="game-container">
+
+    <div class="top-controls">
+        <button class="btn-mode active" id="mode-2p" onclick="setMode('2p')">2 Giocatori</button>
+        <button class="btn-mode" id="mode-ai" onclick="setMode('ai')">vs Computer</button>
+    </div>
+
+    <div class="hud">
+        <div class="hud-player">
+            <div class="hud-dot" style="background:var(--p1)"></div>
+            <span id="hud-p1">P1 (Bianco)</span>
+        </div>
+        <span id="hud-status">Lancia i dadi</span>
+        <div class="hud-player">
+            <div class="hud-dot" style="background:var(--p2)"></div>
+            <span id="hud-p2">P2 (Nero)</span>
+        </div>
+    </div>
+
+    <div class="score-strip">
+        <div class="score-chip">Pipcount P1<span id="sc-pip1">167</span></div>
+        <div class="score-chip">Turno<span id="sc-turn">-</span></div>
+        <div class="score-chip">Pipcount P2<span id="sc-pip2">167</span></div>
+    </div>
+
+    <div class="message-bar" id="message-bar">Premi Lancia Dadi per iniziare.</div>
+
+    <!-- Dadi -->
+    <div class="dice-row">
+        <div class="die" id="die1">-</div>
+        <div class="die" id="die2">-</div>
+        <div class="die" id="die3" style="display:none">-</div>
+        <div class="die" id="die4" style="display:none">-</div>
+        <button class="btn-roll" id="btn-roll" onclick="rollDice()">&#127922; Lancia Dadi</button>
+    </div>
+
+    <!-- Tabellone SVG -->
+    <div class="board-wrap">
+        <svg id="bg-svg" viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+
+    <div class="action-buttons">
+        <button class="action" id="btn-endturn" onclick="endTurn()" disabled>Fine Turno</button>
+        <button class="action" id="btn-reset" onclick="askReset()">&#8635; Nuova</button>
+    </div>
+
+    <div class="rules-toggle"><button onclick="toggleRules()">📖 Regole</button></div>
+    <div class="rules-box" id="rules-box">
+        <strong>Obiettivo:</strong> portare tutte le 15 pedine nella propria casa e poi toglierle dal gioco.<br>
+        <strong>P1 (Blu)</strong> si muove dal punto 24 verso il punto 1 (casa = punti 1-6).<br>
+        <strong>P2 (Verde)</strong> si muove dal punto 1 verso il punto 24 (casa = punti 19-24).<br>
+        <strong>Mosse:</strong> clicca una pedina per selezionarla, poi clicca la destinazione evidenziata.<br>
+        <strong>Hit:</strong> se arrivi su un punto con una sola pedina avversaria, la mandi alla barra.<br>
+        <strong>Barra:</strong> le pedine sulla barra devono rientrare prima di fare altre mosse.<br>
+        <strong>Bear off:</strong> quando tutte le tue pedine sono in casa, puoi toglierle dal gioco.<br>
+        <strong>Doppio:</strong> con due dadi uguali hai 4 mosse invece di 2.
+    </div>
+</div>
+
+<div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+        <div class="modal-title">Nuova Partita?</div>
+        <div class="modal-body">La partita corrente verrà abbandonata. Sicuro?</div>
+        <div class="modal-btns">
+            <button class="modal-btn cancel"  onclick="closeModal()">Annulla</button>
+            <button class="modal-btn confirm" onclick="confirmReset()">Ricomincia</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="winModal">
+    <div class="modal-box">
+        <div class="modal-title" id="win-title">Vittoria!</div>
+        <div class="modal-body" id="win-body"></div>
+        <div class="modal-btns">
+            <button class="modal-btn confirm" onclick="confirmReset(); document.getElementById('winModal').classList.remove('active');">Nuova Partita</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── COSTANTI ──────────────────────────────────────────────────────────────────
+var W=400, H=300, BAR_W=24, MARGIN=6, POINT_W=28, POINT_H=110, CHECKER_R=11;
+var BOARD_X=MARGIN, BOARD_Y=MARGIN, BOARD_W=W-2*MARGIN, BOARD_H=H-2*MARGIN;
+var MID_X = BOARD_X + BOARD_W/2;
+
+// Colori dal tema
+var C_BG='#111217', C_PANEL='#2a2b36', C_POINT_DARK='#1a3a2a', C_POINT_LIGHT='#1a2a3a';
+var C_P1='#3498db', C_P2='#2ecc71', C_ACCENT='#f1c40f', C_TEXT='#f4f4f6';
+var C_HIDDEN='#44475a', C_EMPTY='#111217', C_REVEALED='#21222c';
+var C_BAR='#1e1e24';
+var C_SELECTED='rgba(241,196,15,0.35)', C_DEST='rgba(241,196,15,0.6)';
+
+// ── STATO ─────────────────────────────────────────────────────────────────────
+// points[0..23]: positivi = P1, negativi = P2
+// bar: {0: n pedine P1 sulla barra, 1: n pedine P2}
+// borneOff: {0: n P1 uscite, 1: n P2 uscite}
+var state = {};
+var gameMode = '2p';
+var currentPlayer = 0; // 0=P1, 1=P2
+var dice = [];          // mosse rimanenti
+var rawDice = [];       // dadi lanciati
+var selected = null;    // indice punto selezionato (o 'bar')
+var validMoves = [];    // [{from, to}]
+var gameOver = false;
+var aiThinking = false;
+
+function initState() {
+    // Posizione iniziale standard backgammon
+    // Punto 1=indice 0, punto 24=indice 23
+    // P1 positivi, muove verso indice 0 (punto 1)
+    // P2 negativi, muove verso indice 23 (punto 24)
+    var pts = new Array(24).fill(0);
+    pts[0]  =  2;   // Punto 1:  2 P1
+    pts[5]  = -5;   // Punto 6:  5 P2
+    pts[7]  = -3;   // Punto 8:  3 P2
+    pts[11] =  5;   // Punto 12: 5 P1
+    pts[12] = -5;   // Punto 13: 5 P2
+    pts[16] =  3;   // Punto 17: 3 P1
+    pts[18] =  5;   // Punto 19: 5 P1
+    pts[23] = -2;   // Punto 24: 2 P2
+    return {
+        points: pts,
+        bar: [0, 0],
+        borneOff: [0, 0]
+    };
+}
+
+// ── GEOMETRIA TABELLONE ───────────────────────────────────────────────────────
+// Punti 13-24 in alto (sinistra->destra), 12-1 in basso (sinistra->destra)
+// Numerazione visiva: alto sx=13..18, alto dx=19..24 | basso sx=12..7, basso dx=6..1
+// Indici array: punto N -> indice N-1
+
+function pointScreenX(ptIdx) {
+    // ptIdx 0-23
+    // Punti 0-5 (1-6): bottom right
+    // Punti 6-11 (7-12): bottom left
+    // Punti 12-17 (13-18): top left
+    // Punti 18-23 (19-24): top right
+    var col, half;
+    if (ptIdx <= 5) {
+        col = 5 - ptIdx; half = 'right'; var row = 'bottom';
+    } else if (ptIdx <= 11) {
+        col = ptIdx - 6; half = 'left'; var row = 'bottom';
+    } else if (ptIdx <= 17) {
+        col = ptIdx - 12; half = 'left'; var row = 'top';
+    } else {
+        col = 23 - ptIdx; half = 'right'; var row = 'top';
+    }
+    var startX;
+    if (half === 'left') {
+        startX = BOARD_X + col * POINT_W;
+    } else {
+        startX = BOARD_X + BOARD_W - BAR_W - (col+1)*POINT_W;
+    }
+    // aggiusta per barra centrale
+    if (half === 'right') startX -= 0; // già ok
+    return startX + POINT_W/2;
+}
+
+function pointScreenY(ptIdx, row) {
+    if (ptIdx >= 12) return BOARD_Y + MARGIN; // top
+    return BOARD_Y + BOARD_H - MARGIN;         // bottom
+}
+
+function isTop(ptIdx) { return ptIdx >= 12; }
+
+// ── RENDERING SVG ─────────────────────────────────────────────────────────────
+function makeSVGEl(tag, attrs) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+}
+
+function drawBoard() {
+    var svg = document.getElementById('bg-svg');
+    svg.innerHTML = '';
+
+    // Sfondo board
+    svg.appendChild(makeSVGEl('rect', {x:BOARD_X,y:BOARD_Y,width:BOARD_W,height:BOARD_H,rx:6,fill:C_BG}));
+
+    // Barra centrale
+    var barX = MID_X - BAR_W/2;
+    svg.appendChild(makeSVGEl('rect', {x:barX,y:BOARD_Y,width:BAR_W,height:BOARD_H,fill:C_BAR}));
+
+    // Punti (triangoli)
+    for (var i = 0; i < 24; i++) {
+        drawPoint(svg, i);
+    }
+
+    // Pedine
+    for (var i = 0; i < 24; i++) {
+        var cnt = state.points[i];
+        if (cnt !== 0) drawCheckers(svg, i, cnt);
+    }
+
+    // Barra pedine
+    if (state.bar[0] > 0) drawBarCheckers(svg, 0);
+    if (state.bar[1] > 0) drawBarCheckers(svg, 1);
+
+    // Bear-off area
+    drawBearOff(svg);
+
+    // Selezione e destinazioni
+    if (selected !== null) {
+        drawSelection(svg);
+    }
+
+    // Etichette punti
+    drawLabels(svg);
+}
+
+function drawPoint(svg, i) {
+    var dark = (i % 2 === 0);
+    var fill = dark ? C_POINT_DARK : C_POINT_LIGHT;
+    var cx = pointXCenter(i);
+    var top = isTop(i);
+    var bx = cx - POINT_W/2 + 2;
+    var by = top ? BOARD_Y + MARGIN/2 : BOARD_Y + BOARD_H - POINT_H - MARGIN/2;
+    var tx = cx, ty = top ? by + POINT_H : by;
+    var pts = bx+','+by+' '+(bx+POINT_W-4)+','+by+' '+tx+','+ty;
+    svg.appendChild(makeSVGEl('polygon', {points:pts, fill:fill, opacity:'0.85'}));
+}
+
+function pointXCenter(i) {
+    // Colonne: 0-5 bottom-right, 6-11 bottom-left, 12-17 top-left, 18-23 top-right
+    var barX = MID_X - BAR_W/2;
+    var bw = barX - BOARD_X; // larghezza metà sinistra
+    if (i <= 5) {
+        // bottom right: punti 1-6, colonna da destra
+        var col = 5 - i;
+        return MID_X + BAR_W/2 + col * POINT_W + POINT_W/2;
+    } else if (i <= 11) {
+        // bottom left: punti 7-12
+        var col = i - 6;
+        return BOARD_X + col * POINT_W + POINT_W/2;
+    } else if (i <= 17) {
+        // top left: punti 13-18
+        var col = i - 12;
+        return BOARD_X + col * POINT_W + POINT_W/2;
+    } else {
+        // top right: punti 19-24
+        var col = 23 - i;
+        return MID_X + BAR_W/2 + col * POINT_W + POINT_W/2;
+    }
+}
+
+function drawCheckers(svg, ptIdx, cnt) {
+    var top = isTop(ptIdx);
+    var cx = pointXCenter(ptIdx);
+    var player = cnt > 0 ? 0 : 1;
+    var n = Math.abs(cnt);
+    var fill = player === 0 ? C_P1 : C_P2;
+    var stroke = player === 0 ? '#1a5a8a' : '#1a7a3a';
+    var startY = top ? BOARD_Y + MARGIN + CHECKER_R : BOARD_Y + BOARD_H - MARGIN - CHECKER_R;
+    var dir = top ? 1 : -1;
+    var maxStack = 5;
+    for (var k = 0; k < Math.min(n, maxStack); k++) {
+        var cy = startY + dir * k * (CHECKER_R*2 + 1);
+        var g = makeSVGEl('g', {});
+        g.appendChild(makeSVGEl('circle', {cx:cx, cy:cy, r:CHECKER_R, fill:fill, stroke:stroke, 'stroke-width':'1.5'}));
+        // numero se >1
+        if (k === 0 && n > 1) {
+            var t = makeSVGEl('text', {x:cx, y:cy+4, 'text-anchor':'middle', fill:'#fff', 'font-size':'9', 'font-weight':'bold', 'pointer-events':'none'});
+            t.textContent = n > maxStack && k === maxStack-1 ? n : (n > 1 ? n : '');
+            g.appendChild(t);
+        }
+        svg.appendChild(g);
+    }
+}
+
+function drawBarCheckers(svg, player) {
+    var n = state.bar[player];
+    if (n === 0) return;
+    var fill = player === 0 ? C_P1 : C_P2;
+    var stroke = player === 0 ? '#1a5a8a' : '#1a7a3a';
+    var cx = MID_X;
+    // P1 bar: basso, P2 bar: alto
+    var startY = player === 0 ? BOARD_Y + BOARD_H/2 + CHECKER_R : BOARD_Y + BOARD_H/2 - CHECKER_R;
+    var dir = player === 0 ? 1 : -1;
+    for (var k = 0; k < Math.min(n, 4); k++) {
+        var cy = startY + dir * k * (CHECKER_R*2+1);
+        var g = makeSVGEl('g', {});
+        g.appendChild(makeSVGEl('circle', {cx:cx, cy:cy, r:CHECKER_R, fill:fill, stroke:stroke, 'stroke-width':'1.5'}));
+        if (k === 0) {
+            var t = makeSVGEl('text', {x:cx, y:cy+4, 'text-anchor':'middle', fill:'#fff', 'font-size':'9', 'font-weight':'bold', 'pointer-events':'none'});
+            t.textContent = n > 1 ? n : '';
+            g.appendChild(t);
+        }
+        svg.appendChild(g);
+    }
+}
+
+function drawBearOff(svg) {
+    // P1 bear-off: angolo in basso a destra oltre il tabellone (piccola area)
+    var bx = W - MARGIN - 18, by_p1 = BOARD_Y + BOARD_H/2 + 5, by_p2 = BOARD_Y + BOARD_H/2 - 5;
+    // Mostra contatore
+    var t1 = makeSVGEl('text', {x:W-MARGIN-9, y:BOARD_Y+BOARD_H-10, 'text-anchor':'middle', fill:C_P1, 'font-size':'10', 'font-weight':'bold'});
+    t1.textContent = state.borneOff[0] > 0 ? state.borneOff[0] : '';
+    svg.appendChild(t1);
+    var t2 = makeSVGEl('text', {x:W-MARGIN-9, y:BOARD_Y+14, 'text-anchor':'middle', fill:C_P2, 'font-size':'10', 'font-weight':'bold'});
+    t2.textContent = state.borneOff[1] > 0 ? state.borneOff[1] : '';
+    svg.appendChild(t2);
+}
+
+function drawSelection(svg) {
+    var p = currentPlayer;
+    var fill = p === 0 ? C_P1 : C_P2;
+
+    // ── Evidenzia la colonna selezionata (sfondo tenue) ──
+    if (selected === 'bar') {
+        // niente sfondo colonna, l'anello sulla pedina basta
+    } else {
+        var cx = pointXCenter(selected);
+        svg.appendChild(makeSVGEl('rect', {
+            x: cx-POINT_W/2+2, y: BOARD_Y+2,
+            width: POINT_W-4, height: BOARD_H-4,
+            rx: 4, fill: 'rgba(241,196,15,0.12)', 'pointer-events':'none'
+        }));
+    }
+
+    // ── Anello pulsante sulla prima pedina selezionata ──
+    var selCx, selCy;
+    if (selected === 'bar') {
+        selCx = MID_X;
+        selCy = p === 0 ? BOARD_Y+BOARD_H*3/4 : BOARD_Y+BOARD_H/4;
+    } else {
+        selCx = pointXCenter(selected);
+        var cnt = Math.abs(state.points[selected]);
+        var top = isTop(selected);
+        selCy = top
+            ? BOARD_Y + MARGIN + CHECKER_R
+            : BOARD_Y + BOARD_H - MARGIN - CHECKER_R;
+    }
+    // Anello esterno giallo
+    var ring = makeSVGEl('circle', {
+        cx: selCx, cy: selCy,
+        r: CHECKER_R + 5,
+        fill: 'none',
+        stroke: C_ACCENT,
+        'stroke-width': '2.5',
+        'pointer-events': 'none'
+    });
+    ring.innerHTML = '<animate attributeName="r" values="'+(CHECKER_R+4)+';'+(CHECKER_R+7)+';'+(CHECKER_R+4)+'" dur="0.9s" repeatCount="indefinite"/>'
+                   + '<animate attributeName="opacity" values="1;0.5;1" dur="0.9s" repeatCount="indefinite"/>';
+    svg.appendChild(ring);
+
+    // Label "SELEZIONATA" sopra/sotto
+    var labelY = isTop(selected === 'bar' ? (p===0?0:23) : selected)
+        ? selCy + CHECKER_R + 14
+        : selCy - CHECKER_R - 6;
+    if (selected === 'bar') labelY = selCy + CHECKER_R + 14;
+    var lbl = makeSVGEl('text', {
+        x: selCx, y: labelY,
+        'text-anchor': 'middle',
+        fill: C_ACCENT, 'font-size': '7', 'font-weight': 'bold',
+        'pointer-events': 'none'
+    });
+    lbl.textContent = '● SEL';
+    svg.appendChild(lbl);
+
+    // ── Destinazioni valide ──
+    var dests = getDestsForSelected();
+    dests.forEach(function(d) {
+        if (d === 'off') {
+            svg.appendChild(makeSVGEl('rect', {
+                x: W-MARGIN-20, y: BOARD_Y+2, width: 18, height: BOARD_H-4,
+                rx: 4, fill: 'rgba(241,196,15,0.45)', 'pointer-events':'none'
+            }));
+            var ot = makeSVGEl('text', {
+                x: W-MARGIN-11, y: BOARD_H/2+4,
+                'text-anchor':'middle', fill: C_ACCENT,
+                'font-size':'8','font-weight':'bold','pointer-events':'none'
+            });
+            ot.textContent = 'OUT';
+            svg.appendChild(ot);
+        } else {
+            var dcx = pointXCenter(d);
+            // Sfondo destinazione
+            svg.appendChild(makeSVGEl('rect', {
+                x: dcx-POINT_W/2+2, y: BOARD_Y+2,
+                width: POINT_W-4, height: BOARD_H-4,
+                rx: 4, fill: 'rgba(241,196,15,0.35)', 'pointer-events':'none'
+            }));
+            // Pallino destinazione al centro della colonna
+            var dTop = isTop(d);
+            var dcy = dTop ? BOARD_Y + MARGIN + CHECKER_R : BOARD_Y + BOARD_H - MARGIN - CHECKER_R;
+            svg.appendChild(makeSVGEl('circle', {
+                cx: dcx, cy: dcy, r: 6,
+                fill: C_ACCENT, opacity: '0.7', 'pointer-events':'none'
+            }));
+        }
+    });
+}
+
+function drawLabels(svg) {
+    // Numeri punti in basso sotto e sopra il tabellone
+    for (var i = 0; i < 24; i++) {
+        var cx = pointXCenter(i);
+        var ptNum = i + 1;
+        if (isTop(i)) {
+            var t = makeSVGEl('text', {x:cx, y:BOARD_Y+BOARD_H-2, 'text-anchor':'middle', fill:'#5a5c72', 'font-size':'7'});
+            t.textContent = ptNum;
+            svg.appendChild(t);
+        } else {
+            var t = makeSVGEl('text', {x:cx, y:BOARD_Y+9, 'text-anchor':'middle', fill:'#5a5c72', 'font-size':'7'});
+            t.textContent = ptNum;
+            svg.appendChild(t);
+        }
+    }
+}
+
+// ── CLICK HANDLER ─────────────────────────────────────────────────────────────
+document.getElementById('bg-svg').addEventListener('click', function(e) {
+    if (gameOver || aiThinking) return;
+    if (dice.length === 0) return;
+    var rect = e.currentTarget.getBoundingClientRect();
+    var scaleX = W / rect.width;
+    var mx = (e.clientX - rect.left) * scaleX;
+    var my = (e.clientY - rect.top) * (H / rect.height);
+
+    // Check click su bear-off area (destra)
+    if (mx > W - MARGIN - 22 && mx < W - MARGIN) {
+        handleClick('off'); return;
+    }
+    // Check barra
+    if (mx >= MID_X - BAR_W/2 && mx <= MID_X + BAR_W/2) {
+        handleClick('bar'); return;
+    }
+    // Check punti
+    for (var i = 0; i < 24; i++) {
+        var cx = pointXCenter(i);
+        if (Math.abs(mx - cx) < POINT_W/2) {
+            handleClick(i); return;
+        }
+    }
+});
+
+function handleClick(target) {
+    if (dice.length === 0) return;
+    var p = currentPlayer;
+
+    // Se ho una pedina sulla barra devo prima rientrare
+    if (state.bar[p] > 0) {
+        if (target === 'bar') {
+            selected = 'bar';
+        } else if (selected === 'bar') {
+            // Tentativo di mossa dalla barra
+            var dests = getDestsForSelected();
+            if (dests.indexOf(target) >= 0) {
+                doMove('bar', target);
+                selected = null;
+            }
+        } else {
+            selected = 'bar';
+        }
+        drawBoard(); return;
+    }
+
+    var pname = currentPlayer === 0 ? 'P1' : (gameMode==='ai'?'Computer':'P2');
+
+    if (selected === null) {
+        // Seleziona pedina
+        if (target !== 'bar' && target !== 'off' && canSelectPoint(target)) {
+            selected = target;
+            var n = Math.abs(state.points[target]);
+            setMsg(pname + ': punto ' + (target+1) + ' selezionato (' + n + ' pedina/e). Clicca destinazione o ri-clicca per deselezionare.');
+        } else if (target !== 'bar' && target !== 'off') {
+            setMsg('Quella punta non ha tue pedine. Scegli un\'altra.');
+        }
+    } else {
+        // Ho già qualcosa selezionato
+        if (target === selected) {
+            // Secondo click sulla stessa → deseleziona
+            selected = null;
+            setMsg(pname + ': selezione annullata. Scegli una pedina.');
+        } else {
+            var dests = getDestsForSelected();
+            if (dests.indexOf(target) >= 0) {
+                doMove(selected, target);
+                selected = null;
+            } else if (target !== 'bar' && target !== 'off' && canSelectPoint(target)) {
+                // Cambia selezione
+                selected = target;
+                var n = Math.abs(state.points[target]);
+                setMsg(pname + ': punto ' + (target+1) + ' selezionato (' + n + ' pedina/e). Clicca destinazione o ri-clicca per deselezionare.');
+            } else {
+                setMsg('Destinazione non valida. Clicca un punto evidenziato o ri-clicca la pedina per deselezionarla.');
+            }
+        }
+    }
+    drawBoard();
+}
+
+function canSelectPoint(ptIdx) {
+    var p = currentPlayer;
+    if (p === 0) return state.points[ptIdx] > 0;
+    return state.points[ptIdx] < 0;
+}
+
+function getDestsForSelected() {
+    if (selected === null) return [];
+    var p = currentPlayer;
+    var dests = [];
+    var usedDice = {};
+    dice.forEach(function(d, idx) {
+        if (usedDice[idx]) return;
+        var dest = moveDest(selected, d, p);
+        if (dest !== null && dests.indexOf(dest) < 0) dests.push(dest);
+        usedDice[idx] = true;
+    });
+    // Rimuovi duplicati
+    return dests.filter(function(d, i) { return dests.indexOf(d) === i; });
+}
+
+function moveDest(from, die, player) {
+    if (player === 0) {
+        // P1 muove verso indice 0
+        if (from === 'bar') {
+            // Rientra sul punto 24-die (indice 24-die)
+            var to = 24 - die;
+            if (to < 0 || to > 23) return null;
+            return isValidDest(to, player) ? to : null;
+        }
+        var to = from - die;
+        if (to < 0) {
+            // Bear off
+            if (allInHome(player)) return 'off';
+            return null;
+        }
+        return isValidDest(to, player) ? to : null;
+    } else {
+        // P2 muove verso indice 23
+        if (from === 'bar') {
+            var to = die - 1;
+            if (to < 0 || to > 23) return null;
+            return isValidDest(to, player) ? to : null;
+        }
+        var to = from + die;
+        if (to > 23) {
+            if (allInHome(player)) return 'off';
+            return null;
+        }
+        return isValidDest(to, player) ? to : null;
+    }
+}
+
+function isValidDest(ptIdx, player) {
+    var cnt = state.points[ptIdx];
+    if (player === 0) return cnt >= -1; // libero o mio o blot avversario
+    return cnt <= 1;
+}
+
+function allInHome(player) {
+    if (state.bar[player] > 0) return false;
+    if (player === 0) {
+        // Casa P1: punti 1-6 (indici 0-5)
+        for (var i = 6; i < 24; i++) if (state.points[i] > 0) return false;
+    } else {
+        // Casa P2: punti 19-24 (indici 18-23)
+        for (var i = 0; i < 18; i++) if (state.points[i] < 0) return false;
+    }
+    return true;
+}
+
+function doMove(from, to) {
+    var p = currentPlayer;
+    var sign = p === 0 ? 1 : -1;
+
+    // Rimuovi pedina dalla sorgente
+    if (from === 'bar') {
+        state.bar[p]--;
+    } else {
+        state.points[from] -= sign;
+    }
+
+    if (to === 'off') {
+        state.borneOff[p]++;
+    } else {
+        // Hit avversario?
+        var opp = p === 0 ? -1 : 1;
+        if (state.points[to] === opp) {
+            state.points[to] = 0;
+            state.bar[1-p]++;
+        }
+        state.points[to] += sign;
+    }
+
+    // Consuma dado usato
+    var dieUsed = (from === 'bar') ?
+        (p === 0 ? 24 - to : to + 1) :
+        (to === 'off' ? findBearOffDie(from, p) : Math.abs(to - from));
+
+    var idx = dice.indexOf(dieUsed);
+    if (idx >= 0) dice.splice(idx, 1);
+    else dice.splice(0, 1); // fallback
+
+    updatePipcount();
+    checkWin();
+
+    if (!gameOver && dice.length === 0) {
+        setMsg('Nessuna mossa rimanente. Fine turno.', '');
+        document.getElementById('btn-endturn').disabled = false;
+    } else if (!gameOver) {
+        // Controlla se esistono mosse valide con i dadi rimanenti
+        if (!hasAnyMove(p)) {
+            setMsg('Nessuna mossa possibile con i dadi rimanenti.', '');
+            document.getElementById('btn-endturn').disabled = false;
+        }
+    }
+    drawBoard();
+}
+
+function findBearOffDie(from, player) {
+    // Per bear-off: cerca il dado esatto o il più piccolo > distanza
+    var dist = player === 0 ? from + 1 : 24 - from;
+    var sorted = dice.slice().sort(function(a,b){return a-b;});
+    for (var i = 0; i < sorted.length; i++) {
+        if (sorted[i] >= dist) return sorted[i];
+    }
+    return sorted[sorted.length-1];
+}
+
+function hasAnyMove(player) {
+    var src = [];
+    if (state.bar[player] > 0) { src = ['bar']; }
+    else {
+        for (var i = 0; i < 24; i++) {
+            if (player === 0 && state.points[i] > 0) src.push(i);
+            if (player === 1 && state.points[i] < 0) src.push(i);
+        }
+    }
+    for (var s = 0; s < src.length; s++) {
+        for (var d = 0; d < dice.length; d++) {
+            var dest = moveDest(src[s], dice[d], player);
+            if (dest !== null) return true;
+        }
+    }
+    return false;
+}
+
+// ── DADI ──────────────────────────────────────────────────────────────────────
+function rollDice() {
+    if (gameOver) return;
+    var d1 = Math.floor(Math.random()*6)+1;
+    var d2 = Math.floor(Math.random()*6)+1;
+    rawDice = [d1, d2];
+    dice = (d1 === d2) ? [d1, d1, d1, d1] : [d1, d2];
+
+    // Mostra dadi
+    var dieEls = ['die1','die2','die3','die4'];
+    var cls = currentPlayer === 0 ? 'die p1c' : 'die p2c';
+    for (var i = 0; i < 4; i++) {
+        var el = document.getElementById(dieEls[i]);
+        if (i < dice.length) {
+            el.style.display = 'flex';
+            el.textContent = dice[i];
+            el.className = cls;
+        } else {
+            el.style.display = 'none';
+        }
+    }
+
+    document.getElementById('btn-roll').disabled = true;
+    var pname = currentPlayer === 0 ? 'P1 (Blu)' : (gameMode==='ai'?'Computer':'P2 (Verde)');
+    document.getElementById('sc-turn').textContent = 'P'+(currentPlayer+1);
+
+    if (!hasAnyMove(currentPlayer)) {
+        setMsg(pname + ' lancia ' + rawDice.join('-') + ' — nessuna mossa!', '');
+        document.getElementById('btn-endturn').disabled = false;
+        return;
+    }
+    setMsg(pname + ' lancia ' + rawDice.join('-') + '. Scegli una pedina.', '');
+
+    if (gameMode === 'ai' && currentPlayer === 1) {
+        setTimeout(doAITurn, 700);
+    }
+}
+
+// ── FINE TURNO ────────────────────────────────────────────────────────────────
+function endTurn() {
+    if (gameOver) return;
+    currentPlayer = 1 - currentPlayer;
+    dice = []; rawDice = [];
+    selected = null;
+    document.getElementById('btn-roll').disabled = false;
+    document.getElementById('btn-endturn').disabled = true;
+    document.getElementById('sc-turn').textContent = 'P'+(currentPlayer+1);
+    var pname = currentPlayer === 0 ? 'P1 (Blu)' : (gameMode==='ai'?'Computer':'P2 (Verde)');
+    setMsg('Turno di ' + pname + '. Lancia i dadi.');
+    // Azzera dadi visivi
+    ['die1','die2','die3','die4'].forEach(function(id){
+        var el=document.getElementById(id); el.textContent='-'; el.className='die'; el.style.display= id==='die1'||id==='die2'?'flex':'none';
+    });
+    drawBoard();
+    if (gameMode === 'ai' && currentPlayer === 1) {
+        setTimeout(rollDice, 600);
+    }
+}
+
+// ── AI ────────────────────────────────────────────────────────────────────────
+function doAITurn() {
+    aiThinking = true;
+    var moved = true;
+    var safetyLimit = 20;
+    while (dice.length > 0 && moved && safetyLimit-- > 0) {
+        moved = false;
+        var best = findBestAIMove();
+        if (best) {
+            doMove(best.from, best.to);
+            moved = true;
+            drawBoard();
+        }
+    }
+    aiThinking = false;
+    if (!gameOver) {
+        setTimeout(function() { endTurn(); }, 600);
+    }
+}
+
+function findBestAIMove() {
+    // AI greedy: massimizza utilità (avanza, hit avversario, non lascia blot)
+    var p = 1;
+    var src = [];
+    if (state.bar[p] > 0) src = ['bar'];
+    else {
+        for (var i = 0; i < 24; i++) if (state.points[i] < 0) src.push(i);
+    }
+    var best = null, bestScore = -Infinity;
+    var usedDice = {};
+    for (var s = 0; s < src.length; s++) {
+        for (var d = 0; d < dice.length; d++) {
+            if (usedDice[d]) continue;
+            var dest = moveDest(src[s], dice[d], p);
+            if (dest === null) continue;
+            var score = evalAIMove(src[s], dest, p);
+            if (score > bestScore) { bestScore = score; best = {from: src[s], to: dest}; }
+            usedDice[d] = true;
+        }
+    }
+    return best;
+}
+
+function evalAIMove(from, to, player) {
+    var score = 0;
+    if (to === 'off') return 100;
+    // Avanza (P2 verso 23)
+    var progress = player === 1 ? (to - (from === 'bar' ? -1 : from)) : ((from === 'bar' ? 24 : from) - to);
+    score += progress * 2;
+    // Hit avversario
+    if (state.points[to] === 1) score += 15;
+    // Evita blot (rimanere soli)
+    var afterCnt = state.points[to] + (player === 1 ? -1 : 1);
+    if (Math.abs(afterCnt) === 1) score -= 8;
+    // Costruisci punto (>=2 pedine)
+    if (Math.abs(afterCnt) >= 2) score += 5;
+    return score;
+}
+
+// ── PIPCOUNT & WIN ────────────────────────────────────────────────────────────
+function updatePipcount() {
+    var pip0 = 0, pip1 = 0;
+    for (var i = 0; i < 24; i++) {
+        var cnt = state.points[i];
+        if (cnt > 0) pip0 += cnt * (i + 1);      // P1 vuole arrivare a 0
+        if (cnt < 0) pip1 += Math.abs(cnt) * (24 - i); // P2 vuole arrivare a 25
+    }
+    pip0 += state.bar[0] * 25;
+    pip1 += state.bar[1] * 25;
+    document.getElementById('sc-pip1').textContent = pip0;
+    document.getElementById('sc-pip2').textContent = pip1;
+}
+
+function checkWin() {
+    if (state.borneOff[0] >= 15) { showWin(0); return; }
+    if (state.borneOff[1] >= 15) { showWin(1); return; }
+}
+
+function showWin(player) {
+    gameOver = true;
+    var name = player === 0 ? 'P1 (Blu)' : (gameMode==='ai' && player===1 ? 'Computer' : 'P2 (Verde)');
+    document.getElementById('win-title').textContent = name + ' vince!';
+    document.getElementById('win-body').textContent = name + ' ha portato fuori tutte le pedine. Ottima partita!';
+    document.getElementById('winModal').classList.add('active');
+    setMsg(name + ' ha vinto la partita!', 'win');
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function setMsg(txt, type) {
+    var el = document.getElementById('message-bar');
+    el.textContent = txt;
+    el.className = 'message-bar' + (type ? ' ' + type : '');
+}
+
+function setMode(m) {
+    gameMode = m;
+    document.getElementById('mode-2p').className = 'btn-mode' + (m==='2p'?' active':'');
+    document.getElementById('mode-ai').className = 'btn-mode' + (m==='ai'?' active':'');
+    document.getElementById('hud-p2').textContent = m==='ai' ? 'Computer (Verde)' : 'P2 (Verde)';
+    confirmReset();
+}
+
+function askReset() { document.getElementById('confirmModal').classList.add('active'); }
+function closeModal() { document.getElementById('confirmModal').classList.remove('active'); }
+function confirmReset() {
+    closeModal();
+    state = initState();
+    currentPlayer = 0;
+    dice = []; rawDice = [];
+    selected = null;
+    gameOver = false;
+    aiThinking = false;
+    document.getElementById('btn-roll').disabled = false;
+    document.getElementById('btn-endturn').disabled = true;
+    document.getElementById('sc-turn').textContent = '-';
+    ['die1','die2','die3','die4'].forEach(function(id, i){
+        var el=document.getElementById(id);
+        el.textContent='-'; el.className='die';
+        el.style.display= i<2?'flex':'none';
+    });
+    updatePipcount();
+    setMsg('Premi Lancia Dadi per iniziare. Turno di P1 (Blu).');
+    drawBoard();
+}
+
+function toggleRules() {
+    var rb = document.getElementById('rules-box');
+    rb.style.display = rb.style.display === 'block' ? 'none' : 'block';
+}
+
+// ── START ─────────────────────────────────────────────────────────────────────
+state = initState();
+updatePipcount();
+drawBoard();
+</script>
+</body>
+</html>
