@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 const CATEGORIES = [
   'Tasse', 'IMU', 'Bollo Auto', 'SMAT', 'Luce', 'Gas',
   'Acqua', 'Internet', 'Mutuo/Affitto', 'Bolletta',
-  'Assicurazione Auto', 'Assicurazione Casa', 'Altro',
+  'Assicurazione', 'Altro',
 ]
 
 function calcNextDue(baseDate, interval) {
@@ -201,14 +201,9 @@ export default function PaymentsScreen({ user }) {
 
   // sort: unpaid first (by due_date asc), then paid (by paid_at desc)
   const sorted = [...filtered].sort((a, b) => {
-    if (!a.is_paid && b.is_paid)  return -1
-    if (a.is_paid  && !b.is_paid) return 1
-    if (!a.is_paid && !b.is_paid) {
-      const da = a.due_date ? new Date(a.due_date) : new Date('9999-12-31')
-      const db = b.due_date ? new Date(b.due_date) : new Date('9999-12-31')
-      return da - db
-    }
-    return new Date(b.paid_at || 0) - new Date(a.paid_at || 0)
+    const da = a.due_date ? new Date(a.due_date) : new Date('9999-12-31')
+    const db = b.due_date ? new Date(b.due_date) : new Date('9999-12-31')
+    return da - db
   })
 
   const now        = new Date()
