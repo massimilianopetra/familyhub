@@ -392,14 +392,12 @@ export default function PaymentsScreen({ user }) {
           )}
 
           <div style={{ display: 'flex', gap: 10 }}>
-            {editingId && (
-              <button onClick={closeForm} disabled={saving}
-                style={{ flex: '0 0 auto', backgroundColor: 'transparent', color: '#64748b', border: '1px solid #ccc',
-                  borderRadius: 8, padding: '11px 18px', fontWeight: 600, fontSize: 14,
-                  cursor: saving ? 'not-allowed' : 'pointer' }}>
-                Annulla
-              </button>
-            )}
+            <button onClick={closeForm} disabled={saving}
+              style={{ flex: '0 0 auto', backgroundColor: 'transparent', color: '#64748b', border: '1px solid #ccc',
+                borderRadius: 8, padding: '11px 18px', fontWeight: 600, fontSize: 14,
+                cursor: saving ? 'not-allowed' : 'pointer' }}>
+              Annulla
+            </button>
             <button onClick={handleSave} disabled={saving}
               style={{ flex: 1, backgroundColor: saving ? '#555' : '#1c1c1c', color: '#fff', border: 'none',
                 borderRadius: 8, padding: '11px 0', fontWeight: 600, fontSize: 14,
@@ -536,4 +534,4 @@ export default function PaymentsScreen({ user }) {
 const sLabel = { color: '#94a3b8', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }
 const fld    = { marginBottom: 14 }
 const lbl    = { display: 'block', fontSize: 13, fontWeight: 500, color: '#444', marginBottom: 5 }
-const inp    = { width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #ccc', fontSize: 14, outline: 'none', backgroundColor: '#f9f9f9', boxSizing: 'border-box', fontFamily: 'system-ui, -apple-system, sans-serif' }
+const inp    = { width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #ccc', fontSize: 14, outline: 'none', backgroundColor: '#f9f9f9', color: '#111', colorScheme: 'light', boxSizing: 'border-box', fontFamily: 'system-ui, -apple-system, sans-serif' }
