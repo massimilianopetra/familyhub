@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 
 const CATEGORIES = [
@@ -74,8 +74,13 @@ export default function PaymentsScreen({ user }) {
   const [onlyMine,    setOnlyMine]    = useState(true)
   const [markingPaid, setMarkingPaid] = useState(null) // { id, date }
   const [editingId,   setEditingId]   = useState(null)
+  const formRef = useRef(null)
 
   useEffect(() => { loadPayments() }, [])
+
+  useEffect(() => {
+    if (showForm) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [showForm])
 
   async function loadPayments() {
     setLoading(true)
@@ -311,7 +316,7 @@ export default function PaymentsScreen({ user }) {
 
       {/* Add form */}
       {showForm && (
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '20px', marginBottom: 24 }}>
+        <div ref={formRef} style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '20px', marginBottom: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: '#111', marginBottom: 18 }}>
             {editingId ? '✏️ Modifica pagamento' : 'Nuovo pagamento'}
           </div>
