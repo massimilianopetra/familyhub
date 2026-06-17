@@ -3,7 +3,8 @@ import { supabase } from '../supabaseClient'
 
 const CATEGORIES = [
   'Tasse', 'IMU', 'Bollo Auto', 'SMAT', 'Luce', 'Gas',
-  'Acqua', 'Internet', 'Mutuo/Affitto', 'Bolletta', 'Altro',
+  'Acqua', 'Internet', 'Mutuo/Affitto', 'Bolletta',
+  'Assicurazione Auto', 'Assicurazione Casa', 'Altro',
 ]
 
 function calcNextDue(baseDate, interval) {
@@ -138,17 +139,54 @@ export default function PaymentsScreen({ user }) {
       ? await supabase.from('payments').update(payload).eq('id', editingId)
       : await supabase.from('payments').insert({ ...payload, user_id: user.id })
 
-    if (error) setError(error.message)
-    else { closeForm(); await loadPayments() }
+    if (error) { setError(error.message); setSaving(false); return }
+    // auto-crea prossima scadenza se ricorrente e già pagato (solo su nuovo inserimento)
+    if (!editingId && payload.is_paid && payload.is_recurring && payload.due_date) {
+      await autoCreateNext({ ...payload, user_id: user.id })
+    }
+    closeForm()
+    await loadPayments()
     setSaving(false)
+  }
+
+  async function autoCreateNext(paymentData) {
+    if (!paymentData.is_recurring || !paymentData.due_date) return
+    const nextDue = calcNextDue(paymentData.due_date, paymentData.recurrence_interval)
+    // duplicate check in-memory
+    const inMemory = payments.some(p =>
+      p.user_id === user.id && p.title === paymentData.title && p.due_date === nextDue
+    )
+    if (inMemory) return
+    // duplicate check on DB
+    const { data: existing } = await supabase
+      .from('payments').select('id')
+      .eq('user_id', user.id).eq('title', paymentData.title).eq('due_date', nextDue)
+      .maybeSingle()
+    if (existing) return
+    await supabase.from('payments').insert({
+      user_id:             user.id,
+      title:               paymentData.title,
+      amount:              paymentData.amount,
+      category:            paymentData.category,
+      due_date:            nextDue,
+      is_paid:             false,
+      paid_at:             null,
+      notes:               paymentData.notes || null,
+      is_recurring:        true,
+      recurrence_interval: paymentData.recurrence_interval,
+      next_due_date:       calcNextDue(nextDue, paymentData.recurrence_interval),
+    })
   }
 
   async function handleMarkPaid(id, date) {
     setError('')
+    const payment = payments.find(p => p.id === id)
     const { error } = await supabase
       .from('payments').update({ is_paid: true, paid_at: date }).eq('id', id)
-    if (error) setError(error.message)
-    else { setMarkingPaid(null); await loadPayments() }
+    if (error) { setError(error.message); return }
+    setMarkingPaid(null)
+    if (payment) await autoCreateNext(payment)
+    await loadPayments()
   }
 
   async function handleDelete(id) {
@@ -353,12 +391,22 @@ export default function PaymentsScreen({ user }) {
             </div>
           )}
 
-          <button onClick={handleSave} disabled={saving}
-            style={{ backgroundColor: saving ? '#555' : '#1c1c1c', color: '#fff', border: 'none',
-              borderRadius: 8, padding: '11px 0', width: '100%', fontWeight: 600, fontSize: 14,
-              cursor: saving ? 'not-allowed' : 'pointer' }}>
-            {saving ? 'Salvataggio...' : editingId ? 'Aggiorna pagamento' : 'Salva pagamento'}
-          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {editingId && (
+              <button onClick={closeForm} disabled={saving}
+                style={{ flex: '0 0 auto', backgroundColor: 'transparent', color: '#64748b', border: '1px solid #ccc',
+                  borderRadius: 8, padding: '11px 18px', fontWeight: 600, fontSize: 14,
+                  cursor: saving ? 'not-allowed' : 'pointer' }}>
+                Annulla
+              </button>
+            )}
+            <button onClick={handleSave} disabled={saving}
+              style={{ flex: 1, backgroundColor: saving ? '#555' : '#1c1c1c', color: '#fff', border: 'none',
+                borderRadius: 8, padding: '11px 0', fontWeight: 600, fontSize: 14,
+                cursor: saving ? 'not-allowed' : 'pointer' }}>
+              {saving ? 'Salvataggio...' : editingId ? 'Aggiorna pagamento' : 'Salva pagamento'}
+            </button>
+          </div>
         </div>
       )}
 
