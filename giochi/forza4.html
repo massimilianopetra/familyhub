@@ -34,7 +34,8 @@
         /* message */
         .message-bar { background: var(--empty); border-radius: 5px; padding: 4px 8px; font-size: 0.7rem; color: #a0a2b1; text-align: center; margin-bottom: 5px; min-height: 24px; display: flex; align-items: center; justify-content: center; }
         .message-bar.highlight { color: var(--accent); font-weight: bold; }
-        .message-bar.win { color: var(--p2); font-weight: bold; }
+        .message-bar.win { color: #2ecc71; font-weight: bold; background: rgba(46,204,113,0.15); box-shadow: inset 0 0 0 1px rgba(46,204,113,0.4); }
+        .message-bar.draw { color: #f1c40f; font-weight: bold; background: rgba(241,196,15,0.12); box-shadow: inset 0 0 0 1px rgba(241,196,15,0.35); }
         .message-bar.lose { color: #ff5555; font-weight: bold; }
 
         /* tabellone SVG */
@@ -160,15 +161,6 @@
     </div>
 </div>
 
-<div class="modal-overlay" id="winModal">
-    <div class="modal-box">
-        <div class="modal-title" id="win-title">Vittoria!</div>
-        <div class="modal-body" id="win-body"></div>
-        <div class="modal-btns">
-            <button class="modal-btn confirm" onclick="confirmReset(); document.getElementById('winModal').classList.remove('active');">Nuova Partita</button>
-        </div>
-    </div>
-</div>
 
 <script>
 // ── COSTANTI ──────────────────────────────────────────────────────────────────
@@ -233,6 +225,12 @@ function drawBoard(winCells) {
     }
 
     if (winCells) {
+        var first = winCells[0], last = winCells[winCells.length-1];
+        svg.appendChild(makeSVGEl('line', {
+            x1: cellCX(first.col), y1: cellCY(first.row),
+            x2: cellCX(last.col), y2: cellCY(last.row),
+            stroke: C_WIN, 'stroke-width': '7', 'stroke-linecap': 'round', opacity: '0.85'
+        }));
         winCells.forEach(function(cell) {
             var ring = makeSVGEl('circle', {
                 cx: cellCX(cell.col), cy: cellCY(cell.row), r: HOLE_R+3,
@@ -308,8 +306,8 @@ function afterMove(col, row) {
         if (player === 0) score.p1++; else score.p2++;
         updateScore();
         var pname = playerName(player);
-        setMsg(pname + ' ha vinto!', 'win');
-        showWin(player);
+        setMsg('🏆 ' + pname + ' ha vinto! Allineate 4 pedine.', 'win');
+        updateHud();
         return;
     }
 
@@ -319,8 +317,8 @@ function afterMove(col, row) {
         gameOver = true;
         score.draw++;
         updateScore();
-        setMsg('Pareggio! Il tabellone è pieno.', '');
-        showDraw();
+        setMsg('🤝 Pareggio! Il tabellone è pieno.', 'draw');
+        updateHud();
         return;
     }
 
@@ -486,21 +484,6 @@ function renderMoveLog() {
     document.getElementById('move-log-label2').textContent = gameMode==='ai' ? 'CPU' : 'P2';
     document.getElementById('move-log-p1').textContent = moveLog[0];
     document.getElementById('move-log-p2').textContent = moveLog[1];
-}
-
-function showWin(player) {
-    var name = playerName(player);
-    document.getElementById('win-title').textContent = name + ' vince!';
-    document.getElementById('win-body').textContent = name + ' ha allineato 4 pedine. Ottima partita!';
-    document.getElementById('winModal').classList.add('active');
-    updateHud();
-}
-
-function showDraw() {
-    document.getElementById('win-title').textContent = 'Pareggio!';
-    document.getElementById('win-body').textContent = 'Il tabellone è pieno. Nessun vincitore questa volta.';
-    document.getElementById('winModal').classList.add('active');
-    updateHud();
 }
 
 function setMode(m) {
