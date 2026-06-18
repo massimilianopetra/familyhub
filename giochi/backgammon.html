@@ -224,6 +224,7 @@ var gameMode = '2p';
 var currentPlayer = 0; // 0=P1, 1=P2
 var dice = [];          // mosse rimanenti
 var rawDice = [];       // dadi lanciati
+var diceState = [];     // [{value, used}] per il rendering visivo dei dadi
 var selected = null;    // indice punto selezionato (o 'bar')
 var validMoves = [];    // [{from, to}]
 var gameOver = false;
@@ -783,6 +784,12 @@ function doMove(from, to) {
     if (idx >= 0) dice.splice(idx, 1);
     else dice.splice(0, 1); // fallback
 
+    // Segna il primo slot visivo non ancora usato con quel valore
+    for (var ds = 0; ds < diceState.length; ds++) {
+        if (!diceState[ds].used && diceState[ds].value === dieUsed) { diceState[ds].used = true; break; }
+    }
+    renderDiceRow();
+
     // Registra la mossa nel log dell'ultimo turno di questo giocatore
     var logText = fromLabel + ' → ' + toLabel + ' (dado ' + dieUsed + ')' + (hit ? ' 🎯' : '');
     turnLog[p].push(logText);
@@ -833,30 +840,36 @@ function hasAnyMove(player) {
 }
 
 // ── DADI ──────────────────────────────────────────────────────────────────────
+// Disegna i dadi dello slot visivo (die1..die4) in base a diceState,
+// scurendo quelli già giocati così si capisce a colpo d'occhio cosa resta da usare.
+function renderDiceRow() {
+    var dieEls = ['die1','die2','die3','die4'];
+    var cls = currentPlayer === 0 ? 'p1c' : 'p2c';
+    for (var i = 0; i < 4; i++) {
+        var el = document.getElementById(dieEls[i]);
+        if (i < diceState.length) {
+            el.style.display = 'flex';
+            el.textContent = diceState[i].value;
+            el.className = 'die ' + cls + (diceState[i].used ? ' used' : '');
+        } else {
+            el.style.display = 'none';
+        }
+    }
+}
+
 function rollDice() {
     if (gameOver) return;
     var d1 = Math.floor(Math.random()*6)+1;
     var d2 = Math.floor(Math.random()*6)+1;
     rawDice = [d1, d2];
     dice = (d1 === d2) ? [d1, d1, d1, d1] : [d1, d2];
+    diceState = dice.map(function(v) { return { value: v, used: false }; });
 
     // Nuovo turno: azzera il log delle mosse precedenti di questo giocatore
     turnLog[currentPlayer] = [];
     renderMoveLog();
 
-    // Mostra dadi
-    var dieEls = ['die1','die2','die3','die4'];
-    var cls = currentPlayer === 0 ? 'die p1c' : 'die p2c';
-    for (var i = 0; i < 4; i++) {
-        var el = document.getElementById(dieEls[i]);
-        if (i < dice.length) {
-            el.style.display = 'flex';
-            el.textContent = dice[i];
-            el.className = cls;
-        } else {
-            el.style.display = 'none';
-        }
-    }
+    renderDiceRow();
 
     document.getElementById('btn-roll').disabled = true;
     var pname = currentPlayer === 0 ? 'P1 (Blu)' : (gameMode==='ai'?'Computer':'P2 (Verde)');
@@ -878,7 +891,7 @@ function rollDice() {
 function endTurn() {
     if (gameOver) return;
     currentPlayer = 1 - currentPlayer;
-    dice = []; rawDice = [];
+    dice = []; rawDice = []; diceState = [];
     selected = null;
     document.getElementById('btn-roll').disabled = false;
     document.getElementById('btn-endturn').disabled = true;
@@ -1028,7 +1041,7 @@ function chooseFirstMove(who) {
 function startGame(humanFirst) {
     state = initState();
     currentPlayer = humanFirst ? 0 : 1;
-    dice = []; rawDice = [];
+    dice = []; rawDice = []; diceState = [];
     selected = null;
     gameOver = false;
     aiThinking = false;
