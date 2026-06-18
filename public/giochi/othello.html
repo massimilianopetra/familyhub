@@ -62,9 +62,11 @@
         .modal-title { margin: 0 0 8px; font-size: 1.1rem; font-weight: bold; color: #f4f4f6; }
         .modal-msg { margin: 0 0 20px; color: #a0a2b1; font-size: 0.83rem; line-height: 1.5; }
         .modal-buttons { display: flex; gap: 8px; }
+        .modal-buttons.col { flex-direction: column; }
         .modal-btn { flex: 1; padding: 11px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; }
         .modal-btn-cancel  { background: #44475a; color: #f4f4f6; }
         .modal-btn-confirm { background: #50fa7b; color: #111217; }
+        .modal-btn-neutral { background: #3a3d4d; color: #f4f4f6; }
     </style>
 </head>
 <body>
@@ -130,6 +132,19 @@
     </div>
 </div>
 
+<div id="firstMoveModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-icon">🤖</div>
+        <h2 class="modal-title">Chi inizia?</h2>
+        <p class="modal-msg">Scegli chi fa la prima mossa contro il Computer.</p>
+        <div class="modal-buttons col">
+            <button class="modal-btn modal-btn-confirm" onclick="chooseFirstMove('human')">🙋 Io per primo</button>
+            <button class="modal-btn modal-btn-cancel" onclick="chooseFirstMove('computer')">🤖 Computer per primo</button>
+            <button class="modal-btn modal-btn-neutral" onclick="chooseFirstMove('random')">🎲 A caso</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const SIZE = 8;
 const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
@@ -148,12 +163,12 @@ const WEIGHTS = [
 
 let board, currentPlayer, gameMode, gameOver, lastMove, lastFlips, aiThinking;
 
-function initGame() {
+function initGame(humanFirst) {
     board = Array.from({length: SIZE}, () => Array(SIZE).fill(0));
     const m = SIZE / 2;
     board[m-1][m-1] = 2; board[m][m] = 2;
     board[m-1][m]   = 1; board[m][m-1] = 1;
-    currentPlayer = 1;
+    currentPlayer = (humanFirst === false) ? 2 : 1;
     gameOver = false;
     lastMove = null;
     lastFlips = [];
@@ -161,6 +176,7 @@ function initGame() {
     setMsg('Clicca una casella evidenziata per giocare', false);
     updateHud();
     render();
+    if (gameMode === 'ai' && currentPlayer === 2) setTimeout(triggerAI, 450);
 }
 
 function setGameMode(mode) {
@@ -170,7 +186,17 @@ function setGameMode(mode) {
     const isAI = mode === 'ai';
     document.getElementById('lbl-p2').textContent = isAI ? 'Computer' : 'Giocatore 2';
     document.getElementById('chip-p2').querySelector('span').previousSibling.textContent = isAI ? 'CPU ' : 'P2 ';
-    initGame();
+    if (isAI) {
+        document.getElementById('firstMoveModal').classList.add('active');
+    } else {
+        initGame(true);
+    }
+}
+
+function chooseFirstMove(who) {
+    document.getElementById('firstMoveModal').classList.remove('active');
+    const humanFirst = who === 'random' ? Math.random() < 0.5 : (who === 'human');
+    initGame(humanFirst);
 }
 
 function getFlips(b, r, c, player) {
@@ -350,7 +376,14 @@ function setMsg(txt, highlight) {
 function toggleRules()  { const rb = document.getElementById('rules-box'); rb.style.display = rb.style.display === 'block' ? 'none' : 'block'; }
 function askNewGame()   { document.getElementById('confirmModal').classList.add('active'); }
 function closeModal()   { document.getElementById('confirmModal').classList.remove('active'); }
-function confirmNewGame(){ closeModal(); initGame(); }
+function confirmNewGame(){
+    closeModal();
+    if (gameMode === 'ai') {
+        document.getElementById('firstMoveModal').classList.add('active');
+    } else {
+        initGame(true);
+    }
+}
 document.getElementById('confirmModal').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
 
 gameMode = '2p';

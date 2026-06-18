@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 
 const CATEGORIES = [
-  'Tasse', 'IMU', 'Bollo Auto', 'SMAT', 'Luce', 'Gas',
+  'Tasse', 'Tassa Rifiuti', 'IMU', 'Bollo Auto', 'SMAT', 'Luce', 'Gas',
   'Acqua', 'Internet', 'Mutuo/Affitto', 'Bolletta',
   'Assicurazione', 'Altro',
 ]
