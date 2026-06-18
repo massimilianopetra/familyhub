@@ -36,6 +36,28 @@ Lista cronologica degli eventi dei prossimi **3 mesi**, raggruppata per data.
 - Filtro "Solo miei" (default attivo)
 - Quando il filtro è disattivato, gli eventi degli altri familiari sono visivamente distinti: bordo tratteggiato, sfondo più scuro, badge **👤 Famiglia**
 
+### 💳 Pagamenti
+
+Gestione delle scadenze e bollette di casa, con riepilogo mensile e promemoria.
+
+- **Categorie predefinite**: Tasse, Tassa Rifiuti, IMU, Bollo Auto, SMAT, Luce, Gas, Acqua, Internet, Mutuo/Affitto, Bolletta, Assicurazione, Altro.
+- **Stato pagamento**: ogni voce è marcata come *Da pagare*, *Scaduto* (oltre la data di scadenza) o *✓ Pagato* (con data effettiva di pagamento).
+- **Pagamenti ricorrenti**: frequenza mensile / trimestrale / annuale. Quando una voce ricorrente viene segnata come pagata, viene creata automaticamente la scadenza successiva (con controllo anti-duplicati lato memoria e lato database).
+- **Export `.ics`**: ogni scadenza (anche ricorrente, con `RRULE`) può essere scaricata come evento calendario standard e importata in qualsiasi app di calendario.
+- **Scadenze imminenti**: riquadro dedicato alle voci da pagare nei prossimi 30 giorni, evidenziate in rosso se entro 7 giorni.
+- **Riepilogo mensile**: totale di quanto pagato nel mese corrente.
+- **Filtro "Solo miei"** e badge **👤 Famiglia** per le voci inserite da altri membri (come nel Calendario).
+
+### 🎫 Tessere Fedeltà
+
+Portafoglio digitale per le tessere punti/fedeltà dei negozi, con barcode/QR pronti per la scansione alla cassa.
+
+- **Formati supportati**: Code 128, EAN-13, EAN-8 (con validazione della cifra di controllo), QR Code.
+- **Scansione da fotocamera**: tramite `BarcodeDetector` del browser è possibile fotografare il codice a barre di una tessera fisica per importarlo automaticamente (fallback a inserimento manuale se l'API non è supportata).
+- **Vista a schermo intero**: tocco sulla tessera per mostrarla ingrandita e pronta da far leggere allo scanner del negozio.
+- **Colore personalizzato** per ogni tessera, con testo automaticamente contrastato (chiaro/scuro) in base alla luminosità dello sfondo.
+- **Filtro "Solo mie"** per nascondere le tessere inserite dagli altri membri della famiglia.
+
 ### 🎮 Giochi
 
 Raccolta di giochi classici ottimizzati per mobile, con tema dark retro.
@@ -120,6 +142,8 @@ Visibile esclusivamente all'account amministratore. Permette di:
 |---|---|
 | `calendar_events` | Eventi del calendario con `user_id`, tipologia, date (inizio + fine), orari, colore |
 | `app_settings` | Impostazioni globali dell'app (es. `registration_enabled`) |
+| `payments` | Pagamenti/bollette con `user_id`, titolo, importo, categoria, scadenza, stato pagato, ricorrenza |
+| `loyalty_cards` | Tessere fedeltà con `user_id`, nome negozio, valore e formato barcode, colore |
 
 Row Level Security abilitata: ogni utente può modificare solo i propri eventi; tutti possono leggere.
 
