@@ -6,6 +6,7 @@ import UpcomingEventsSection from './UpcomingEventsSection'
 import LoyaltyCardsSection from './LoyaltyCardsSection'
 import AdminSection from './AdminSection'
 import PaymentsScreen from './PaymentsScreen'
+import DailyReminderModal from './DailyReminderModal'
 
 const SUPER_USER = 'massimiliano.petra@gmail.com'
 
@@ -40,6 +41,7 @@ function HamburgerIcon() {
 export default function Dashboard({ session }) {
   const [section,    setSection]    = useState('calendar')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [reminderTrigger, setReminderTrigger] = useState(0)
   const isMobile  = useIsMobile()
   const isSuperUser = session.user.email === SUPER_USER
   const nav = isSuperUser
@@ -53,6 +55,8 @@ export default function Dashboard({ session }) {
 
   return (
     <div style={{ ...s.shell, flexDirection: isMobile ? 'column' : 'row' }}>
+
+      <DailyReminderModal session={session} forceTrigger={reminderTrigger} />
 
       {/* ── SIDEBAR desktop ─────────────────────────────────── */}
       {!isMobile && (
@@ -70,6 +74,10 @@ export default function Dashboard({ session }) {
               </button>
             ))}
           </nav>
+          <button style={s.reminderBtn} onClick={() => setReminderTrigger(t => t + 1)}>
+            <span style={s.navIcon}>📋</span>
+            <span>Riepilogo</span>
+          </button>
           <div style={s.sidebarFooter}>
             <div style={s.userEmail}>{session.user.email}</div>
             <button style={s.logoutBtn} onClick={() => supabase.auth.signOut()}>Esci</button>
@@ -109,6 +117,11 @@ export default function Dashboard({ session }) {
                 </button>
               ))}
             </nav>
+
+            <button style={s.drawerReminderBtn} onClick={() => { setReminderTrigger(t => t + 1); setDrawerOpen(false) }}>
+              <span style={s.drawerItemIcon}>📋</span>
+              <span>Riepilogo</span>
+            </button>
 
             <div style={s.drawerFooter}>
               <div style={s.userEmail}>{session.user.email}</div>
@@ -167,6 +180,14 @@ const s = {
   },
   navItemActive: { backgroundColor: '#0f172a', color: '#38bdf8' },
   navIcon: { fontSize: '1.1rem' },
+  reminderBtn: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    padding: '10px 12px', borderRadius: '8px',
+    border: '1px solid #334155', backgroundColor: 'transparent',
+    color: '#94a3b8', cursor: 'pointer',
+    fontSize: '0.9rem', fontWeight: '500',
+    textAlign: 'left', width: '100%', marginTop: '8px',
+  },
   sidebarFooter: {
     borderTop: '1px solid #334155', paddingTop: '16px',
     display: 'flex', flexDirection: 'column', gap: '8px',
@@ -233,6 +254,14 @@ const s = {
   },
   drawerItemActive: { backgroundColor: '#0f172a', color: '#38bdf8' },
   drawerItemIcon: { fontSize: '1.2rem' },
+  drawerReminderBtn: {
+    display: 'flex', alignItems: 'center', gap: '12px',
+    margin: '0 12px 12px', padding: '13px 14px', borderRadius: '8px',
+    border: '1px solid #334155', backgroundColor: 'transparent',
+    color: '#94a3b8', cursor: 'pointer',
+    fontSize: '0.95rem', fontWeight: '500',
+    textAlign: 'left', width: 'calc(100% - 24px)', flexShrink: 0,
+  },
   drawerFooter: {
     borderTop: '1px solid #334155',
     padding: '16px 12px',
