@@ -51,6 +51,8 @@ Raccolta di giochi classici ottimizzati per mobile, con tema dark retro.
 | **Blackjack** | Gioco contro il banco con puntate, raddoppio e statistica crediti. Mazzo singolo da 52 carte persistente tra le mani (rimescolato automaticamente sotto le 15 carte residue). |
 | **Mancala** | Antico gioco africano dei semi. Modalità 2 giocatori o vs Computer. Animazione seme per seme, annulla mossa, velocità regolabile. |
 | **Othello** | Classico Reversi su griglia 8×8. Modalità 2 giocatori o vs Computer. Animazione flip delle pedine catturate, caselle valide evidenziate. |
+| **Backgammon** | Tabellone classico su SVG. Modalità 2 giocatori o vs Computer. Dadi che si scuriscono man mano che vengono giocati, pipcount, log mosse. |
+| **Forza 4** | Allinea 4 pedine in griglia 7×6. Modalità 2 giocatori o vs Computer. |
 
 #### 🤖 Intelligenza artificiale nei giochi
 
@@ -71,6 +73,29 @@ La funzione di valutazione usa una **matrice di pesi posizionali** 8×8:
 - I **bordi** hanno valore medio-alto perché limitano le mosse avversarie.
 - Le **celle adiacenti agli angoli** hanno valore negativo (−20/−40): occuparle prima di controllare l'angolo regala spesso l'angolo all'avversario.
 - Il centro ha valore basso nelle prime fasi; la valutazione posizionale è dominante rispetto al semplice conteggio delle pedine.
+
+**Backgammon — AI greedy (1 livello)**
+
+Per ogni dado disponibile il computer valuta tutte le mosse possibili assegnando un punteggio:
+- **avanzamento**: pip percorsi verso casa;
+- **bear-off** immediato: punteggio massimo, sempre prioritario;
+- **hit** dell'avversario (pedina singola su un punto): bonus;
+- **blot**: penalità se la mossa lascia una propria pedina sola e scoperta;
+- **punto chiuso**: bonus se la mossa porta a ≥2 pedine sullo stesso punto.
+
+Sceglie la mossa con punteggio più alto per ciascun dado rimanente, senza look-ahead sui dadi successivi.
+
+**Forza 4 — Minimax con Alpha-Beta pruning, profondità 5**
+
+Stesso schema di Othello: esplorazione **minimax** con potatura **alpha-beta**, qui a profondità 5 mosse. L'ordine di esplorazione delle colonne parte dal centro (`3,2,4,1,5,0,6`) per massimizzare l'efficacia della potatura.
+
+La funzione di valutazione scorre tutte le finestre di 4 celle (orizzontali, verticali, diagonali) e assegna punteggi:
+- 4 in fila: vittoria (1000 punti, o ±1.000.000 se rilevata durante la ricerca);
+- 3 proprie + 1 vuota: +50;
+- 2 proprie + 2 vuote: +10;
+- 3 avversarie + 1 vuota: −80 (penalità forte, da bloccare);
+- 2 avversarie + 2 vuote: −5;
+- bonus per le pedine proprie nella colonna centrale (colonna più versatile).
 
 ### ⚙️ Pannello Admin *(solo super user)*
 
