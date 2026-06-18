@@ -71,9 +71,12 @@
         .modal-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 8px; }
         .modal-body  { font-size: 0.78rem; color: #a0a2b1; margin-bottom: 18px; line-height: 1.5; }
         .modal-btns  { display: flex; gap: 10px; justify-content: center; }
+        .modal-btns.col { flex-direction: column; }
         .modal-btn   { flex: 1; max-width: 110px; padding: 10px; border: none; border-radius: 8px; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
+        .modal-btns.col .modal-btn { max-width: none; }
         .modal-btn.confirm { background: #ff5555; color: #fff; }
         .modal-btn.cancel  { background: var(--hidden); color: var(--text); }
+        .modal-btn.neutral { background: #3a3d4d; color: var(--text); }
     </style>
 </head>
 <body>
@@ -141,6 +144,18 @@
         <div class="modal-btns">
             <button class="modal-btn cancel"  onclick="closeModal()">Annulla</button>
             <button class="modal-btn confirm" onclick="confirmReset()">Ricomincia</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="firstMoveModal">
+    <div class="modal-box">
+        <div class="modal-title">Chi inizia?</div>
+        <div class="modal-body">Scegli chi fa la prima mossa contro il Computer.</div>
+        <div class="modal-btns col">
+            <button class="modal-btn confirm" onclick="chooseFirstMove('human')">🙋 Io per primo</button>
+            <button class="modal-btn cancel" onclick="chooseFirstMove('computer')">🤖 Computer per primo</button>
+            <button class="modal-btn neutral" onclick="chooseFirstMove('random')">🎲 A caso</button>
         </div>
     </div>
 </div>
@@ -495,22 +510,45 @@ function setMode(m) {
     document.getElementById('hud-p2').textContent = m==='ai' ? 'Computer (Giallo)' : 'P2 (Giallo)';
     score = { p1:0, p2:0, draw:0 };
     updateScore();
-    confirmReset();
+    if (m === 'ai') {
+        document.getElementById('firstMoveModal').classList.add('active');
+    } else {
+        startGame(true);
+    }
 }
 
 function askReset() { document.getElementById('confirmModal').classList.add('active'); }
 function closeModal() { document.getElementById('confirmModal').classList.remove('active'); }
 function confirmReset() {
     closeModal();
+    if (gameMode === 'ai') {
+        document.getElementById('firstMoveModal').classList.add('active');
+    } else {
+        startGame(true);
+    }
+}
+
+function chooseFirstMove(who) {
+    document.getElementById('firstMoveModal').classList.remove('active');
+    var humanFirst = who === 'random' ? Math.random() < 0.5 : (who === 'human');
+    startGame(humanFirst);
+}
+
+function startGame(humanFirst) {
     grid = initGrid();
-    currentPlayer = 0;
+    currentPlayer = humanFirst ? 0 : 1;
     gameOver = false;
     animating = false;
     moveLog = ['—', '—'];
     renderMoveLog();
     updateHud();
-    setMsg('Turno di P1 (Rosso). Scegli una colonna.');
     drawBoard();
+    if (gameMode === 'ai' && currentPlayer === 1) {
+        setMsg('Il Computer sta pensando...', '');
+        setTimeout(aiMove, 450);
+    } else {
+        setMsg('Turno di ' + playerName(currentPlayer) + '. Scegli una colonna.', '');
+    }
 }
 
 function toggleRules() {
