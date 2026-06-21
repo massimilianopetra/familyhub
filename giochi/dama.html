@@ -117,7 +117,7 @@
         <div class="rules-box" id="rules-box">
             <strong>Obiettivo:</strong> catturare tutte le pedine avversarie o bloccarle senza mosse possibili.<br><br>
             <strong>Movimento:</strong> le pedine semplici avanzano di una casella in diagonale, solo in avanti. La Dama si muove di una casella in diagonale in qualsiasi direzione (non "vola").<br><br>
-            <strong>Cattura:</strong> salta in diagonale sopra una pedina avversaria adiacente atterrando nella casella libera successiva. Le pedine semplici catturano solo in avanti, come nel movimento normale; solo la Dama può catturare anche all'indietro.<br><br>
+            <strong>Cattura:</strong> salta in diagonale sopra una pedina avversaria adiacente atterrando nella casella libera successiva. Le pedine semplici catturano solo in avanti, come nel movimento normale; solo la Dama può catturare anche all'indietro. Una pedina semplice non può mai catturare una Dama: solo la Dama può farlo.<br><br>
             <strong>Presa obbligatoria:</strong> se è possibile catturare, è obbligatorio farlo (non esiste più il "soffio": la mossa scorretta viene semplicemente bloccata).<br><br>
             <strong>Prese multiple:</strong> dopo una cattura, se è possibile catturare ancora con la stessa pedina, devi continuare nella stessa mossa.<br><br>
             <strong>Priorità tra prese multiple:</strong> 1) numero massimo di pezzi catturati; 2) a parità, è obbligatorio catturare con la Dama piuttosto che con la pedina; 3) a parità, va preferito il percorso che cattura più Dame; 4) a parità, il percorso che incontra una Dama prima.<br><br>
@@ -195,6 +195,7 @@ function captureSeqs(b, r, c, v) {
         if (!inBounds(lr, lc)) continue;
         const mid = b[mr][mc];
         if (mid === 0 || owner(mid) === owner(v)) continue;
+        if (!isKing(v) && isKing(mid)) continue; // una pedina semplice non può catturare una Dama
         if (b[lr][lc] !== 0) continue;
         const nb = cloneBoard(b);
         nb[r][c] = 0; nb[mr][mc] = 0; nb[lr][lc] = v;
