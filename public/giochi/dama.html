@@ -117,7 +117,7 @@
         <div class="rules-box" id="rules-box">
             <strong>Obiettivo:</strong> catturare tutte le pedine avversarie o bloccarle senza mosse possibili.<br><br>
             <strong>Movimento:</strong> le pedine semplici avanzano di una casella in diagonale, solo in avanti. La Dama si muove di una casella in diagonale in qualsiasi direzione (non "vola").<br><br>
-            <strong>Cattura:</strong> salta in diagonale sopra una pedina avversaria adiacente atterrando nella casella libera successiva. Le pedine semplici possono catturare anche all'indietro.<br><br>
+            <strong>Cattura:</strong> salta in diagonale sopra una pedina avversaria adiacente atterrando nella casella libera successiva. Le pedine semplici catturano solo in avanti, come nel movimento normale; solo la Dama può catturare anche all'indietro.<br><br>
             <strong>Presa obbligatoria:</strong> se è possibile catturare, è obbligatorio farlo (non esiste più il "soffio": la mossa scorretta viene semplicemente bloccata).<br><br>
             <strong>Prese multiple:</strong> dopo una cattura, se è possibile catturare ancora con la stessa pedina, devi continuare nella stessa mossa.<br><br>
             <strong>Priorità tra prese multiple:</strong> 1) numero massimo di pezzi catturati; 2) a parità, è obbligatorio catturare con la Dama piuttosto che con la pedina; 3) a parità, va preferito il percorso che cattura più Dame; 4) a parità, il percorso che incontra una Dama prima.<br><br>
@@ -171,6 +171,8 @@ function owner(v) { return v > 0 ? 1 : (v < 0 ? 2 : 0); }
 function isKing(v) { return Math.abs(v) === 2; }
 function cloneBoard(b) { return b.map(row => row.slice()); }
 function isPromotionRow(v, row) { return v > 0 ? row === 0 : row === 7; }
+// Le pedine semplici catturano solo in avanti, come nello spostamento normale; solo la Dama cattura in tutte le direzioni.
+function pieceDirs(v) { return isKing(v) ? DIAG : (v > 0 ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]); }
 
 function initBoard() {
     const b = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
@@ -188,7 +190,7 @@ function initBoard() {
 // ── GENERAZIONE CATTURE ────────────────────────────────────────────────────────
 function captureSeqs(b, r, c, v) {
     const sequences = [];
-    for (const [dr, dc] of DIAG) {
+    for (const [dr, dc] of pieceDirs(v)) {
         const mr = r + dr, mc = c + dc, lr = r + 2*dr, lc = c + 2*dc;
         if (!inBounds(lr, lc)) continue;
         const mid = b[mr][mc];
@@ -240,8 +242,7 @@ function computeLegalMoves(b, player) {
         for (let c = 0; c < SIZE; c++) {
             const v = b[r][c];
             if (owner(v) !== player) continue;
-            const dirs = isKing(v) ? DIAG : (v > 0 ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]);
-            for (const [dr, dc] of dirs) {
+            for (const [dr, dc] of pieceDirs(v)) {
                 const nr = r + dr, nc = c + dc;
                 if (inBounds(nr, nc) && b[nr][nc] === 0) moves.push({ from: [r, c], to: [nr, nc] });
             }
