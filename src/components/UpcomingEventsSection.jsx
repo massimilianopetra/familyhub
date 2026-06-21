@@ -22,12 +22,18 @@ function fmtGroupHeader(dateStr) {
   const today = new Date(); today.setHours(0,0,0,0)
   const diff  = Math.round((d - today) / 86400000)
   const full  = `${d.getDate()} ${MONTHS_IT[d.getMonth()]} ${d.getFullYear()}`
-  if (diff <= 0) return `Oggi — ${full}`
+  if (diff === 0) return `Oggi — ${full}`
   if (diff === 1) return `Domani — ${full}`
+  if (diff < 0)   return `${full} (${Math.abs(diff)} ${Math.abs(diff) === 1 ? 'giorno' : 'giorni'} fa)`
   return `${DAYS_FULL[d.getDay()]} ${full}`
 }
 
 function buildBadge(event) {
+  if (event.is_deadline) {
+    return event.completed
+      ? { text: '✓ Completata', color: '#4ade80' }
+      : { text: '⏰ Scadenza in corso', color: '#ef4444' }
+  }
   const today = new Date(); today.setHours(0,0,0,0)
   const start = new Date(event.event_date + 'T00:00:00')
   const end   = event.end_date ? new Date(event.end_date + 'T00:00:00') : start
@@ -65,6 +71,7 @@ function AddEventModal({ currentUserId, onClose, onSaved }) {
   const [endTime,     setEndTime]     = useState('')
   const [eventType,   setEventType]   = useState('altro')
   const [description, setDescription] = useState('')
+  const [isDeadline,  setIsDeadline]  = useState(false)
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
@@ -84,6 +91,7 @@ function AddEventModal({ currentUserId, onClose, onSaved }) {
       event_type:  eventType,
       color,
       description: description.trim() || null,
+      is_deadline: isDeadline,
     })
     setSaving(false)
     if (err) { setError('Errore: ' + err.message); return }
@@ -161,6 +169,8 @@ function AddEventModal({ currentUserId, onClose, onSaved }) {
           placeholder="Note (opzionale)" rows={2}
           style={{ ...inp, resize:'vertical' }} />
 
+        <Toggle checked={isDeadline} onChange={setIsDeadline} label="📌 È una scadenza" />
+
         {error && <div style={{ fontSize:'0.8rem', color:'#ef4444' }}>{error}</div>}
 
         <div style={{ display:'flex', gap:'8px' }}>
@@ -188,6 +198,8 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
   const [endTime,     setEndTime]     = useState(event.end_time?.slice(0,5) ?? '')
   const [eventType,   setEventType]   = useState(event.event_type ?? 'altro')
   const [description, setDescription] = useState(event.description ?? '')
+  const [isDeadline,  setIsDeadline]  = useState(event.is_deadline ?? false)
+  const [completed,   setCompleted]   = useState(event.completed ?? false)
   const [saving,      setSaving]      = useState(false)
   const [deleting,    setDeleting]    = useState(false)
   const [confirmDel,  setConfirmDel]  = useState(false)
@@ -199,6 +211,7 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
     if (endDate && endDate < startDate) { setError('La data fine non può essere prima della data inizio'); return }
     setSaving(true)
     const { color } = getEventType(eventType)
+    const completedNow = isDeadline && completed
     const { error: err } = await supabase.from('calendar_events').update({
       title:       title.trim(),
       event_date:  startDate,
@@ -208,6 +221,9 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
       event_type:  eventType,
       color,
       description: description.trim() || null,
+      is_deadline:  isDeadline,
+      completed:    completedNow,
+      completed_at: completedNow ? (event.completed_at ?? new Date().toISOString().slice(0,10)) : null,
     }).eq('id', event.id)
     setSaving(false)
     if (err) { setError('Errore: ' + err.message); return }
@@ -287,6 +303,11 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
           placeholder="Note (opzionale)" rows={2}
           style={{ ...inp, resize:'vertical' }} />
 
+        <Toggle checked={isDeadline} onChange={setIsDeadline} label="📌 È una scadenza" />
+        {isDeadline && (
+          <Toggle checked={completed} onChange={setCompleted} label="✅ Completata" />
+        )}
+
         {error && <div style={{ fontSize:'0.8rem', color:'#ef4444' }}>{error}</div>}
 
         <div style={{ display:'flex', gap:'8px' }}>
@@ -348,7 +369,7 @@ export default function UpcomingEventsSection({ session }) {
       .from('calendar_events')
       .select('*')
       .lte('event_date', limitStr)
-      .or(`event_date.gte.${todayStr},end_date.gte.${todayStr}`)
+      .or(`event_date.gte.${todayStr},end_date.gte.${todayStr},and(is_deadline.eq.true,completed.eq.false)`)
       .order('event_date', { ascending: true })
 
     setEvents(data ?? [])
@@ -357,6 +378,17 @@ export default function UpcomingEventsSection({ session }) {
 
   function deleteEvent(id) {
     setEvents(prev => prev.filter(e => e.id !== id))
+  }
+
+  async function toggleCompleted(event) {
+    const completed    = !event.completed
+    const completed_at = completed ? dateToStr(new Date()) : null
+    const { error } = await supabase.from('calendar_events')
+      .update({ completed, completed_at })
+      .eq('id', event.id)
+    if (!error) {
+      setEvents(prev => prev.map(e => e.id === event.id ? { ...e, completed, completed_at } : e))
+    }
   }
 
   const filteredEvents = useMemo(() =>
@@ -496,6 +528,14 @@ export default function UpcomingEventsSection({ session }) {
                           }}>
                             {badge.text}
                           </span>
+                          {event.is_deadline && isOwn && (
+                            <button onClick={() => toggleCompleted(event)}
+                              style={{ background:'none', border:`1px solid ${event.completed ? '#4ade80' : '#ef4444'}`,
+                                borderRadius:'20px', padding:'2px 8px', fontSize:'0.68rem', fontWeight:'700',
+                                color: event.completed ? '#4ade80' : '#ef4444', cursor:'pointer', whiteSpace:'nowrap' }}>
+                              {event.completed ? '↺ Riapri' : '✓ Completa'}
+                            </button>
+                          )}
                           {isOwn && (
                             <button onClick={() => setEditModal(event)}
                               style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:'0.85rem', padding:'0 2px', lineHeight:1, flexShrink:0 }}>
@@ -506,7 +546,8 @@ export default function UpcomingEventsSection({ session }) {
                       </div>
 
                       {/* Riga 2: titolo */}
-                      <div style={{ fontSize:'1.02rem', fontWeight:'700', color:'#f1f5f9', lineHeight:1.3 }}>
+                      <div style={{ fontSize:'1.02rem', fontWeight:'700', color:'#f1f5f9', lineHeight:1.3,
+                        textDecoration: event.completed ? 'line-through' : 'none', opacity: event.completed ? 0.6 : 1 }}>
                         {event.title}
                       </div>
 

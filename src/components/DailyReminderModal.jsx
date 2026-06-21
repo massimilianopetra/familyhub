@@ -34,11 +34,14 @@ export default function DailyReminderModal({ session, forceTrigger }) {
       const todayS = dateToStr(today)
       const in7S   = dateToStr(in7)
 
-      const [{ data: payments }, { data: events }] = await Promise.all([
+      const [{ data: payments }, { data: events }, { data: deadlines }] = await Promise.all([
         supabase.from('payments').select('*').eq('user_id', userId).eq('is_paid', false),
         supabase.from('calendar_events').select('*').eq('user_id', userId)
           .lte('event_date', in7S)
-          .or(`event_date.gte.${todayS},end_date.gte.${todayS}`),
+          .or(`event_date.gte.${todayS},end_date.gte.${todayS}`)
+          .eq('is_deadline', false),
+        supabase.from('calendar_events').select('*').eq('user_id', userId)
+          .eq('is_deadline', true).eq('completed', false),
       ])
 
       const duePayments = (payments ?? [])
@@ -51,10 +54,13 @@ export default function DailyReminderModal({ session, forceTrigger }) {
       const upcomingEvents = (events ?? [])
         .sort((a, b) => a.event_date.localeCompare(b.event_date))
 
+      const pendingDeadlines = (deadlines ?? [])
+        .sort((a, b) => a.event_date.localeCompare(b.event_date))
+
       if (cancelled) return
       localStorage.setItem(storageKey, todayS)
-      if (duePayments.length > 0 || upcomingEvents.length > 0 || isForced) {
-        setData({ payments: duePayments, events: upcomingEvents, todayS })
+      if (duePayments.length > 0 || upcomingEvents.length > 0 || pendingDeadlines.length > 0 || isForced) {
+        setData({ payments: duePayments, events: upcomingEvents, deadlines: pendingDeadlines, todayS })
       }
     }
 
@@ -64,7 +70,13 @@ export default function DailyReminderModal({ session, forceTrigger }) {
 
   if (!data) return null
 
-  const isEmpty = data.payments.length === 0 && data.events.length === 0
+  async function markDeadlineDone(id) {
+    const completed_at = dateToStr(new Date())
+    await supabase.from('calendar_events').update({ completed: true, completed_at }).eq('id', id)
+    setData(prev => prev && { ...prev, deadlines: prev.deadlines.filter(d => d.id !== id) })
+  }
+
+  const isEmpty = data.payments.length === 0 && data.events.length === 0 && data.deadlines.length === 0
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000,
@@ -101,6 +113,38 @@ export default function DailyReminderModal({ session, forceTrigger }) {
                     <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#f1f5f9', whiteSpace: 'nowrap' }}>
                       € {Number(p.amount).toFixed(2)}
                     </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {data.deadlines.length > 0 && (
+          <div>
+            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase',
+              letterSpacing: '0.05em', marginBottom: '8px' }}>
+              ⏰ Scadenze in corso
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {data.deadlines.map(e => {
+                const { emoji } = getEventType(e.event_type)
+                const overdue = e.event_date < data.todayS
+                return (
+                  <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px',
+                    background: '#0f172a', borderRadius: '8px', padding: '8px 12px',
+                    borderLeft: `3px solid ${overdue ? '#ef4444' : '#fbbf24'}` }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#f1f5f9' }}>{emoji} {e.title}</div>
+                      <div style={{ fontSize: '0.72rem', color: overdue ? '#f87171' : '#94a3b8' }}>
+                        {overdue ? '⚠️ Dal' : 'Dal'} {fmtDate(e.event_date)}
+                      </div>
+                    </div>
+                    <button onClick={() => markDeadlineDone(e.id)}
+                      style={{ background: 'none', border: '1px solid #4ade80', borderRadius: '20px', padding: '3px 10px',
+                        fontSize: '0.7rem', fontWeight: '700', color: '#4ade80', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      ✓ Fatto
+                    </button>
                   </div>
                 )
               })}

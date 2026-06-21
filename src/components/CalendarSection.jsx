@@ -107,10 +107,12 @@ function ShiftCard({ shift, detailed }) {
 // ── Chip evento DB (vista mese desktop) ───────────────────────
 function EventChip({ event, isOwner, onEdit }) {
   const { emoji, color } = getEventType(event.event_type)
+  const overdue = event.is_deadline && !event.completed
   return (
-    <div style={{ backgroundColor: color+'22', border:`1px solid ${color}`, borderRadius:'4px', padding:'1px 5px', fontSize:'0.65rem', color, fontWeight:'600', lineHeight:'1.6', display:'flex', alignItems:'center', gap:'3px', overflow:'hidden' }}>
+    <div style={{ backgroundColor: color+'22', border:`1px solid ${color}`, borderRadius:'4px', padding:'1px 5px', fontSize:'0.65rem', color, fontWeight:'600', lineHeight:'1.6', display:'flex', alignItems:'center', gap:'3px', overflow:'hidden', opacity: event.completed ? 0.55 : 1 }}>
+      {overdue && <span style={{ flexShrink:0 }}>⏰</span>}
       <span style={{ flexShrink:0 }}>{emoji}</span>
-      <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>
+      <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, textDecoration: event.completed ? 'line-through' : 'none' }}>
         {event.title}{event.end_date && event.end_date !== event.event_date ? ' →' : ''}
       </span>
       {isOwner && (
@@ -134,6 +136,7 @@ function EventChipMobile({ event }) {
 // ── Card evento DB (vista settimana/giorno) ────────────────────
 function EventCard({ event, detailed, isOwner, onEdit }) {
   const { emoji, label: typeLabel, color } = getEventType(event.event_type)
+  const overdue = event.is_deadline && !event.completed
   const times = event.start_time
     ? event.end_time
       ? `${event.start_time.slice(0,5)} – ${event.end_time.slice(0,5)}`
@@ -144,13 +147,13 @@ function EventCard({ event, detailed, isOwner, onEdit }) {
     <div style={{
       borderLeft: detailed && !isOwner ? `3px dashed ${color}88` : `3px solid ${color}`,
       backgroundColor: detailed && !isOwner ? color+'0d' : color+'18',
-      opacity: detailed && !isOwner ? 0.82 : 1,
+      opacity: (detailed && !isOwner) ? 0.82 : (event.completed ? 0.55 : 1),
       borderRadius:'6px', padding: detailed ? '10px 14px' : '4px 6px',
       display:'flex', flexDirection:'column', gap:'2px', overflow:'hidden',
     }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'6px' }}>
-        <span style={{ fontSize: detailed ? '0.95rem' : '0.72rem', fontWeight:'700', color:'#f1f5f9', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-          {emoji} {event.title}
+        <span style={{ fontSize: detailed ? '0.95rem' : '0.72rem', fontWeight:'700', color:'#f1f5f9', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration: event.completed ? 'line-through' : 'none' }}>
+          {overdue ? '⏰ ' : ''}{emoji} {event.title}
         </span>
         {isOwner && (
           <button onClick={e => { e.stopPropagation(); onEdit(event) }}
@@ -215,6 +218,7 @@ function AddEventModal({ date, currentUserId, onClose, onSaved }) {
   const [endTime,     setEndTime]     = useState('')
   const [eventType,   setEventType]   = useState('altro')
   const [description, setDescription] = useState('')
+  const [isDeadline,  setIsDeadline]  = useState(false)
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
@@ -236,6 +240,7 @@ function AddEventModal({ date, currentUserId, onClose, onSaved }) {
       event_type:  eventType,
       color,
       description: description.trim() || null,
+      is_deadline: isDeadline,
     })
     setSaving(false)
     if (err) { setError('Errore: ' + err.message); return }
@@ -308,6 +313,8 @@ function AddEventModal({ date, currentUserId, onClose, onSaved }) {
           placeholder="Note (opzionale)" rows={2}
           style={{ ...inp, resize:'vertical' }} />
 
+        <Toggle checked={isDeadline} onChange={setIsDeadline} label="📌 È una scadenza" />
+
         {error && <div style={{ fontSize:'0.8rem', color:'#ef4444' }}>{error}</div>}
 
         <div style={{ display:'flex', gap:'8px' }}>
@@ -334,6 +341,8 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
   const [endTime,     setEndTime]     = useState(event.end_time?.slice(0,5) ?? '')
   const [eventType,   setEventType]   = useState(event.event_type ?? 'altro')
   const [description, setDescription] = useState(event.description ?? '')
+  const [isDeadline,  setIsDeadline]  = useState(event.is_deadline ?? false)
+  const [completed,   setCompleted]   = useState(event.completed ?? false)
   const [saving,      setSaving]      = useState(false)
   const [deleting,    setDeleting]    = useState(false)
   const [confirmDel,  setConfirmDel]  = useState(false)
@@ -345,6 +354,7 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
     if (endDate && endDate < startDate) { setError('La data fine non può essere prima della data inizio'); return }
     setSaving(true)
     const { color } = getEventType(eventType)
+    const completedNow = isDeadline && completed
     const { error: err } = await supabase.from('calendar_events').update({
       title:       title.trim(),
       event_date:  startDate,
@@ -354,6 +364,9 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
       event_type:  eventType,
       color,
       description: description.trim() || null,
+      is_deadline:  isDeadline,
+      completed:    completedNow,
+      completed_at: completedNow ? (event.completed_at ?? new Date().toISOString().slice(0,10)) : null,
     }).eq('id', event.id)
     setSaving(false)
     if (err) { setError('Errore: ' + err.message); return }
@@ -433,6 +446,11 @@ function EditEventModal({ event, onClose, onSaved, onDeleted }) {
         <textarea value={description} onChange={e => setDescription(e.target.value)}
           placeholder="Note (opzionale)" rows={2}
           style={{ ...inp, resize:'vertical' }} />
+
+        <Toggle checked={isDeadline} onChange={setIsDeadline} label="📌 È una scadenza" />
+        {isDeadline && (
+          <Toggle checked={completed} onChange={setCompleted} label="✅ Completata" />
+        )}
 
         {error && <div style={{ fontSize:'0.8rem', color:'#ef4444' }}>{error}</div>}
 
