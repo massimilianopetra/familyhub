@@ -1,0 +1,67 @@
+/* Stile condiviso per i giochi di carte (Solitari). Ogni pagina importa questo file e aggiunge
+   solo lo stile specifico del proprio tavoliere (tableau, fondamenta, celle libere, piramide...). */
+:root {
+    --bg: #1e1e24; --panel: #2a2b36; --text: #f4f4f6; --empty: #111217;
+    --hidden: #44475a; --accent: #f1c40f;
+    --card-w: 50px; --card-h: 74px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size: 1rem; }
+.subtitle { margin-bottom: 6px; color: #a0a2b1; font-size: 0.7rem; text-align: center; }
+.game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 440px; }
+
+.score-strip { display: flex; gap: 5px; margin-bottom: 5px; }
+.score-chip { flex: 1; background: var(--empty); border-radius: 5px; padding: 4px 6px; text-align: center; font-size: 0.63rem; color: #a0a2b1; }
+.score-chip span { display: block; font-size: 0.85rem; font-weight: bold; color: var(--text); }
+
+.message-bar { background: var(--empty); border-radius: 5px; padding: 4px 8px; font-size: 0.7rem; color: #a0a2b1; text-align: center; margin-bottom: 6px; min-height: 24px; display: flex; align-items: center; justify-content: center; }
+.message-bar.highlight { color: var(--accent); font-weight: bold; }
+.message-bar.warn { color: #ff5555; font-weight: bold; }
+.message-bar.win { color: #50fa7b; font-weight: bold; }
+
+.action-buttons { display: flex; gap: 6px; margin-top: 6px; }
+.action { flex: 1; padding: 9px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.8rem; }
+#btn-reset { background: #ff5555; color: #fff; }
+#btn-undo { background: var(--hidden); color: var(--text); }
+#btn-undo:disabled { opacity: 0.35; cursor: default; }
+
+.rules-toggle { text-align: center; margin-top: 8px; }
+.rules-toggle button { background: none; border: 1px solid var(--hidden); color: #a0a2b1; border-radius: 6px; padding: 4px 12px; font-size: 0.68rem; cursor: pointer; }
+.rules-box { display: none; margin-top: 6px; background: var(--empty); border-radius: 6px; padding: 10px; font-size: 0.7rem; color: #a0a2b1; line-height: 1.6; }
+.rules-box strong { color: var(--text); }
+
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+.modal-overlay.active { display: flex; }
+.modal-box { background: #2a2b36; border: 1px solid #44475a; border-radius: 18px; padding: 28px 22px; max-width: 300px; width: 88%; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.85); animation: modalPop 0.2s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes modalPop { from{transform:scale(0.78);opacity:0} to{transform:scale(1);opacity:1} }
+.modal-icon { font-size: 2.4rem; margin-bottom: 8px; }
+.modal-title { margin: 0 0 8px; font-size: 1.1rem; font-weight: bold; color: #f4f4f6; }
+.modal-msg { margin: 0 0 20px; color: #a0a2b1; font-size: 0.83rem; line-height: 1.5; }
+.modal-buttons { display: flex; gap: 8px; }
+.modal-btn { flex: 1; padding: 11px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; }
+.modal-btn-cancel  { background: #44475a; color: #f4f4f6; }
+.modal-btn-confirm { background: #50fa7b; color: #111217; }
+
+/* ── Carte ── */
+.card {
+    width: var(--card-w); height: var(--card-h);
+    background: #f0ede6; border-radius: 6px; border: 1px solid #bbb;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 3px 4px; font-weight: 700;
+    position: relative; flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    font-family: 'Courier New', Courier, monospace;
+    cursor: pointer; user-select: none;
+}
+.card.red   { color: #c0392b; }
+.card.black { color: #1a1b2e; }
+.card .c-top { align-self: flex-start; line-height: 1.1; font-size: 10px; }
+.card .c-mid { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 17px; line-height: 1; }
+.card .c-bot { align-self: flex-end; line-height: 1.1; font-size: 10px; transform: rotate(180deg); }
+.card.hidden { background: #2a2c48; border: 1px solid #3e4060; cursor: pointer; }
+.card.hidden::after { content: ''; position: absolute; inset: 4px; border: 1px solid #4a4c68; border-radius: 4px; }
+.card.selected { box-shadow: 0 0 0 3px var(--accent), 0 2px 6px rgba(0,0,0,0.5); }
+.card.dest-hint { box-shadow: 0 0 0 3px #50fa7b, 0 2px 6px rgba(0,0,0,0.5); }
+.card.placeholder { background: rgba(255,255,255,0.04); border: 1px dashed #44475a; box-shadow: none; cursor: pointer; }
+.card.placeholder.dest-hint { box-shadow: 0 0 0 3px #50fa7b; }

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Spider</title>
+    <link rel="stylesheet" href="cards-common.css">
+    <style>
+        :root { --card-w: 34px; --card-h: 50px; }
+        .top-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .pile-label { font-size: 0.62rem; color: #a0a2b1; text-align: center; margin-top: 3px; }
+        .pile-group { display: flex; flex-direction: column; align-items: center; }
+        .tableau { display: flex; gap: 3px; }
+        .column { position: relative; flex: 1; min-height: 320px; }
+        .card.placeholder { display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+    </style>
+</head>
+<body>
+<h1>Spider</h1>
+<div class="subtitle">Variante a 2 semi — 10 colonne, niente fondamenta</div>
+
+<div class="game-container">
+    <div class="score-strip">
+        <div class="score-chip">Mazzo <span id="sc-stock">5</span></div>
+        <div class="score-chip">Sequenze complete <span id="sc-done">0/8</span></div>
+    </div>
+
+    <div class="message-bar" id="message-bar">Tocca una carta, poi la colonna di destinazione.</div>
+
+    <div class="top-row">
+        <div class="pile-group"><div id="stock-pile"></div><div class="pile-label">Mazzo (pesca per tutte le colonne)</div></div>
+    </div>
+
+    <div class="tableau">
+        <div class="column" id="col-0"></div>
+        <div class="column" id="col-1"></div>
+        <div class="column" id="col-2"></div>
+        <div class="column" id="col-3"></div>
+        <div class="column" id="col-4"></div>
+        <div class="column" id="col-5"></div>
+        <div class="column" id="col-6"></div>
+        <div class="column" id="col-7"></div>
+        <div class="column" id="col-8"></div>
+        <div class="column" id="col-9"></div>
+    </div>
+
+    <div class="action-buttons">
+        <button id="btn-reset" class="action" onclick="askNewGame()">Nuova Partita</button>
+    </div>
+
+    <div class="rules-toggle">
+        <button onclick="toggleRules()">📖 Regole</button>
+        <div class="rules-box" id="rules-box">
+            <strong>Obiettivo:</strong> formare 8 sequenze complete dal Re all'Asso, dello stesso seme, per pulire tutte le 104 carte (2 mazzi, variante a 2 semi).<br><br>
+            <strong>Movimento:</strong> tocca una carta scoperta in cima a una colonna (o l'inizio di una sequenza valida), poi la colonna di destinazione. Una singola carta si appoggia su una di valore immediatamente superiore, di qualsiasi seme.<br><br>
+            <strong>Spostare più carte insieme:</strong> solo se sono dello stesso seme e in sequenza decrescente consecutiva.<br><br>
+            <strong>Mazzo:</strong> tocca il mazzo per distribuire una carta scoperta su ciascuna delle 10 colonne (possibile solo se nessuna colonna è vuota). Il mazzo si svuota in 5 distribuzioni.<br><br>
+            <strong>Sequenza completa:</strong> quando una colonna contiene 13 carte consecutive dello stesso seme da Re ad Asso, vengono rimosse automaticamente.
+        </div>
+    </div>
+</div>
+
+<div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-icon">🕷️</div>
+        <h2 class="modal-title">Nuova Partita?</h2>
+        <p class="modal-msg">La partita corrente andrà persa. Continuare?</p>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-cancel"  onclick="closeModal()">Annulla</button>
+            <button class="modal-btn modal-btn-confirm" onclick="confirmNewGame()">Sì!</button>
+        </div>
+    </div>
+</div>
+
+<script src="cards-common.js"></script>
+<script>
+const OFFSET_UP = 16, OFFSET_DOWN = 6;
+const SPIDER_SUITS = ['spade', 'cuori'];
+let tableau, stock, selected, completedSuits, gameWon;
+
+function buildSpiderDeck() {
+    const copies = 8 / SPIDER_SUITS.length;
+    const deck = [];
+    for (let c = 0; c < copies; c++) for (const s of SPIDER_SUITS) for (const v of VALUES) deck.push({ suit: s, value: v });
+    return deck;
+}
+
+function initGame() {
+    const deck = shuffleDeck(buildSpiderDeck());
+    tableau = Array.from({ length: 10 }, () => []);
+    let idx = 0;
+    for (let c = 0; c < 10; c++) {
+        const n = c < 4 ? 6 : 5;
+        for (let i = 0; i < n; i++) tableau[c].push({ ...deck[idx], faceUp: i === n - 1 });
+        idx += n;
+    }
+    stock = deck.slice(idx).map(c => ({ ...c, faceUp: false }));
+    selected = null;
+    completedSuits = 0;
+    gameWon = false;
+    msg('Tocca una carta, poi la colonna di destinazione.', false);
+    render();
+}
+
+function getMovableRun(col, index) {
+    if (index < 0 || index >= col.length) return null;
+    for (let i = index; i < col.length; i++) if (!col[i].faceUp) return null;
+    for (let i = index; i < col.length - 1; i++) {
+        const a = col[i], b = col[i + 1];
+        if (!(a.suit === b.suit && valueRank(a.value) === valueRank(b.value) + 1)) return null;
+    }
+    return col.slice(index);
+}
+
+function canDropOnTableau(card, destCol) {
+    if (destCol.length === 0) return true;
+    const top = destCol[destCol.length - 1];
+    return valueRank(card.value) === valueRank(top.value) - 1;
+}
+
+function removeSelectedFromSource() { tableau[selected.col].splice(selected.startIndex); }
+
+function flipExposedTableauTop(colIdx) {
+    const col = tableau[colIdx];
+    if (col.length > 0 && !col[col.length - 1].faceUp) col[col.length - 1].faceUp = true;
+}
+
+function checkCompletions() {
+    for (let c = 0; c < 10; c++) {
+        const col = tableau[c];
+        if (col.length < 13) continue;
+        const run = getMovableRun(col, col.length - 13);
+        if (run && run.length === 13 && run[0].value === 'K') {
+            col.splice(col.length - 13);
+            completedSuits++;
+            flipExposedTableauTop(c);
+        }
+    }
+}
+
+function tryDropOnTableau(colIdx) {
+    if (!selected) return false;
+    const cards = selected.cards;
+    if (!canDropOnTableau(cards[0], tableau[colIdx])) return false;
+    const srcCol = selected.col;
+    removeSelectedFromSource();
+    flipExposedTableauTop(srcCol);
+    for (const c of cards) tableau[colIdx].push(c);
+    selected = null;
+    checkCompletions();
+    render();
+    checkWin();
+    return true;
+}
+
+function onTableauCardClick(colIdx, cardIdx) {
+    const col = tableau[colIdx];
+    const clickedExisting = cardIdx >= 0 && cardIdx < col.length;
+
+    if (selected) {
+        if (tryDropOnTableau(colIdx)) return;
+        if (selected.col === colIdx && clickedExisting && cardIdx === selected.startIndex) {
+            selected = null; render(); return;
+        }
+        if (clickedExisting && col[cardIdx].faceUp) {
+            const run = getMovableRun(col, cardIdx);
+            if (run) { selected = { col: colIdx, startIndex: cardIdx, cards: run }; render(); return; }
+        }
+        msg('Mossa non valida.', true);
+        selected = null;
+        render();
+        return;
+    }
+
+    if (!clickedExisting || !col[cardIdx].faceUp) return;
+    const run = getMovableRun(col, cardIdx);
+    if (!run) { msg('Quella carta è sotto altre carte non in sequenza dello stesso seme.', true); return; }
+    selected = { col: colIdx, startIndex: cardIdx, cards: run };
+    render();
+}
+
+function onStockClick() {
+    if (gameWon || stock.length === 0) return;
+    if (tableau.some(col => col.length === 0)) { msg('Non puoi pescare: c\'è una colonna vuota.', true); return; }
+    for (let c = 0; c < 10; c++) {
+        const card = stock.pop();
+        card.faceUp = true;
+        tableau[c].push(card);
+    }
+    selected = null;
+    checkCompletions();
+    render();
+    checkWin();
+}
+
+function checkWin() {
+    if (completedSuits === 8) {
+        gameWon = true;
+        msg('🎉 Hai vinto! Tutte le sequenze completate!', 'win');
+    }
+}
+
+function render() {
+    document.getElementById('sc-stock').textContent = Math.ceil(stock.length / 10);
+    document.getElementById('sc-done').textContent = completedSuits + '/8';
+
+    const stockEl = document.getElementById('stock-pile');
+    stockEl.innerHTML = '';
+    if (stock.length > 0) {
+        const el = cardEl({}, false);
+        el.onclick = onStockClick;
+        stockEl.appendChild(el);
+    } else {
+        const ph = document.createElement('div');
+        ph.className = 'card placeholder';
+        stockEl.appendChild(ph);
+    }
+
+    for (let c = 0; c < 10; c++) {
+        const colEl = document.getElementById('col-' + c);
+        colEl.innerHTML = '';
+        const col = tableau[c];
+        if (col.length === 0) {
+            const ph = document.createElement('div');
+            ph.className = 'card placeholder';
+            ph.style.position = 'absolute';
+            ph.onclick = () => onTableauCardClick(c, -1);
+            colEl.appendChild(ph);
+            continue;
+        }
+        let top = 0;
+        col.forEach((card, i) => {
+            const el = cardEl(card, card.faceUp);
+            el.style.position = 'absolute';
+            el.style.left = '0';
+            el.style.top = top + 'px';
+            if (selected && selected.col === c && i >= selected.startIndex) el.classList.add('selected');
+            el.onclick = () => onTableauCardClick(c, i);
+            colEl.appendChild(el);
+            top += card.faceUp ? OFFSET_UP : OFFSET_DOWN;
+        });
+    }
+}
+
+function msg(txt, type) {
+    const el = document.getElementById('message-bar');
+    el.textContent = txt;
+    el.className = 'message-bar' + (type === true ? ' warn' : (type === 'win' ? ' win' : ''));
+}
+
+function askNewGame() { document.getElementById('confirmModal').classList.add('active'); }
+function closeModal() { document.getElementById('confirmModal').classList.remove('active'); }
+function confirmNewGame() { closeModal(); initGame(); }
+document.getElementById('confirmModal').addEventListener('click', function(e){ if (e.target === this) closeModal(); });
+
+function toggleRules() {
+    const rb = document.getElementById('rules-box');
+    rb.style.display = rb.style.display === 'block' ? 'none' : 'block';
+}
+
+initGame();
+</script>
+</body>
+</html>
