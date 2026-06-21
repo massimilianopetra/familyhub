@@ -44,7 +44,7 @@ const PIP_COL_INDEX = { l: 1, c: 2, r: 3 };
 function cardEl(card, faceUp) {
     const el = document.createElement('div');
     if (!faceUp) { el.className = 'card hidden'; return el; }
-    el.className = 'card ' + (isRedSuit(card.suit) ? 'red' : 'black');
+    el.className = 'card ' + (isRedSuit(card.suit) ? 'red' : 'black') + (PIP_LAYOUT[card.value] ? '' : ' face');
     const sym = SYMS[card.suit];
     const top = document.createElement('span');
     top.className = 'c-top';

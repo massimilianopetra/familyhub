@@ -59,6 +59,7 @@ h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size:
 .card .c-top { align-self: flex-start; line-height: 1.05; font-size: calc(var(--card-w) * 0.16); }
 .card .c-mid { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 17px; line-height: 1; }
 .card .c-bot { align-self: flex-end; line-height: 1.05; font-size: calc(var(--card-w) * 0.16); transform: rotate(180deg); }
+.card.face .c-top, .card.face .c-bot { font-size: calc(var(--card-w) * 0.22); }
 .pip-grid {
     position: absolute;
     top: calc(var(--card-w) * 0.52); bottom: calc(var(--card-w) * 0.52);
