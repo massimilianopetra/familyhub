@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Klondike</title>
+    <link rel="stylesheet" href="cards-common.css">
+    <style>
+        .top-row { display: flex; gap: 6px; margin-bottom: 10px; }
+        .stock, .waste { flex-shrink: 0; }
+        .foundations { display: flex; gap: 6px; margin-left: auto; }
+        .tableau { display: flex; gap: 4px; }
+        .column { position: relative; flex: 1; min-height: 280px; }
+        .card.placeholder { display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+<h1>Klondike</h1>
+<div class="subtitle">Il solitario classico — fondamenta per seme</div>
+
+<div class="game-container">
+    <div class="score-strip">
+        <div class="score-chip">Mazzo <span id="sc-stock">24</span></div>
+        <div class="score-chip">Mosse <span id="sc-moves">0</span></div>
+    </div>
+
+    <div class="message-bar" id="message-bar">Tocca il mazzo per pescare, poi tocca una carta per selezionarla.</div>
+
+    <div class="top-row">
+        <div class="stock" id="stock-pile"></div>
+        <div class="waste" id="waste-pile"></div>
+        <div class="foundations">
+            <div id="found-spade"></div>
+            <div id="found-cuori"></div>
+            <div id="found-quadri"></div>
+            <div id="found-fiori"></div>
+        </div>
+    </div>
+
+    <div class="tableau">
+        <div class="column" id="col-0"></div>
+        <div class="column" id="col-1"></div>
+        <div class="column" id="col-2"></div>
+        <div class="column" id="col-3"></div>
+        <div class="column" id="col-4"></div>
+        <div class="column" id="col-5"></div>
+        <div class="column" id="col-6"></div>
+    </div>
+
+    <div class="action-buttons">
+        <button id="btn-reset" class="action" onclick="askNewGame()">Nuova Partita</button>
+    </div>
+
+    <div class="rules-toggle">
+        <button onclick="toggleRules()">📖 Regole</button>
+        <div class="rules-box" id="rules-box">
+            <strong>Obiettivo:</strong> spostare tutte le 52 carte sulle 4 fondamenta, una per seme, in ordine crescente da Asso a Re.<br><br>
+            <strong>Tableau:</strong> tocca una carta scoperta per selezionarla (e tutte quelle in sequenza sopra di lei), poi tocca la colonna di destinazione. Si appoggia solo su una carta di valore immediatamente superiore e colore opposto, oppure su una colonna vuota solo con un Re.<br><br>
+            <strong>Mazzo/Scarti:</strong> tocca il mazzo per pescare una carta negli scarti. Quando il mazzo è vuoto, toccalo per rimescolare gli scarti.<br><br>
+            <strong>Fondamenta:</strong> tocca una carta selezionata e poi la fondamenta giusta per posarla (serve l'Asso per iniziare). Doppio click su una carta scoperta in cima a una colonna o sugli scarti per mandarla automaticamente in fondamenta, se possibile.<br><br>
+            <strong>Scopertura automatica:</strong> quando liberi una carta in una colonna, si scopre da sola.
+        </div>
+    </div>
+</div>
+
+<div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-icon">🂡</div>
+        <h2 class="modal-title">Nuova Partita?</h2>
+        <p class="modal-msg">La partita corrente andrà persa. Continuare?</p>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-cancel"  onclick="closeModal()">Annulla</button>
+            <button class="modal-btn modal-btn-confirm" onclick="confirmNewGame()">Sì!</button>
+        </div>
+    </div>
+</div>
+
+<script src="cards-common.js"></script>
+<script>
+const OFFSET_UP = 20, OFFSET_DOWN = 8;
+let stock, waste, foundations, tableau, selected, moves, gameWon;
+
+function initGame() {
+    const deck = shuffleDeck(buildDeck());
+    tableau = [];
+    let idx = 0;
+    for (let c = 0; c < 7; c++) {
+        const col = [];
+        for (let i = 0; i <= c; i++) {
+            col.push({ ...deck[idx], faceUp: i === c });
+            idx++;
+        }
+        tableau.push(col);
+    }
+    stock = deck.slice(idx).map(c => ({ ...c, faceUp: false }));
+    waste = [];
+    foundations = { spade: [], cuori: [], quadri: [], fiori: [] };
+    selected = null;
+    moves = 0;
+    gameWon = false;
+    msg('Tocca il mazzo per pescare, poi tocca una carta per selezionarla.', false);
+    render();
+}
+
+// ── REGOLE ─────────────────────────────────────────────────────────────────────
+function getMovableRun(col, index) {
+    if (index < 0 || index >= col.length) return null;
+    for (let i = index; i < col.length; i++) if (!col[i].faceUp) return null;
+    for (let i = index; i < col.length - 1; i++) {
+        const a = col[i], b = col[i + 1];
+        if (!(isAlternateColor(a, b) && valueRank(a.value) === valueRank(b.value) + 1)) return null;
+    }
+    return col.slice(index);
+}
+
+function canDropOnTableau(card, destCol) {
+    if (destCol.length === 0) return card.value === 'K';
+    const top = destCol[destCol.length - 1];
+    return isAlternateColor(card, top) && valueRank(card.value) === valueRank(top.value) - 1;
+}
+
+function canDropOnFoundation(card, suit) {
+    if (card.suit !== suit) return false;
+    const arr = foundations[suit];
+    if (arr.length === 0) return card.value === 'A';
+    return valueRank(card.value) === valueRank(arr[arr.length - 1].value) + 1;
+}
+
+function autoFoundationSuit(card) {
+    for (const s of SUITS) if (canDropOnFoundation(card, s)) return s;
+    return null;
+}
+
+// ── AZIONI ─────────────────────────────────────────────────────────────────────
+function removeSelectedFromSource() {
+    if (selected.source === 'waste') waste.pop();
+    else tableau[selected.col].splice(selected.startIndex);
+}
+
+function flipExposedTableauTop(colIdx) {
+    const col = tableau[colIdx];
+    if (col.length > 0 && !col[col.length - 1].faceUp) col[col.length - 1].faceUp = true;
+}
+
+function onStockClick() {
+    if (gameWon) return;
+    if (stock.length > 0) {
+        const c = stock.pop();
+        c.faceUp = true;
+        waste.push(c);
+    } else if (waste.length > 0) {
+        while (waste.length) { const c = waste.pop(); c.faceUp = false; stock.push(c); }
+    }
+    selected = null;
+    render();
+}
+
+function selectWasteTop() {
+    if (waste.length === 0) return;
+    if (selected && selected.source === 'waste') { selected = null; render(); return; }
+    if (selected) { selected = null; }
+    selected = { source: 'waste', cards: [waste[waste.length - 1]] };
+    render();
+}
+
+function tryDropOnTableau(colIdx) {
+    if (!selected) return false;
+    const card = selected.cards[0];
+    if (!canDropOnTableau(card, tableau[colIdx])) return false;
+    const srcCol = selected.source === 'tableau' ? selected.col : null;
+    removeSelectedFromSource();
+    if (srcCol !== null) flipExposedTableauTop(srcCol);
+    for (const c of selected.cards) tableau[colIdx].push(c);
+    moves++;
+    selected = null;
+    render();
+    checkWin();
+    return true;
+}
+
+function onTableauCardClick(colIdx, cardIdx) {
+    const col = tableau[colIdx];
+    const clickedExisting = cardIdx >= 0 && cardIdx < col.length;
+
+    if (selected) {
+        if (tryDropOnTableau(colIdx)) return;
+        if (selected.source === 'tableau' && selected.col === colIdx && clickedExisting && cardIdx === selected.startIndex) {
+            selected = null; render(); return;
+        }
+        if (clickedExisting && col[cardIdx].faceUp) {
+            const run = getMovableRun(col, cardIdx);
+            if (run) { selected = { source: 'tableau', col: colIdx, startIndex: cardIdx, cards: run }; render(); return; }
+        }
+        msg('Mossa non valida.', true);
+        selected = null;
+        render();
+        return;
+    }
+
+    if (!clickedExisting || !col[cardIdx].faceUp) return;
+    const run = getMovableRun(col, cardIdx);
+    if (!run) { msg('Quella carta è sotto altre carte e non può muoversi.', true); return; }
+    selected = { source: 'tableau', col: colIdx, startIndex: cardIdx, cards: run };
+    render();
+}
+
+function onFoundationClick(suit) {
+    if (!selected) return;
+    if (selected.cards.length !== 1 || !canDropOnFoundation(selected.cards[0], suit)) {
+        msg('Mossa non valida.', true);
+        selected = null;
+        render();
+        return;
+    }
+    const card = selected.cards[0];
+    const srcCol = selected.source === 'tableau' ? selected.col : null;
+    removeSelectedFromSource();
+    if (srcCol !== null) flipExposedTableauTop(srcCol);
+    foundations[suit].push(card);
+    moves++;
+    selected = null;
+    render();
+    checkWin();
+}
+
+function dblClickAutoFoundation(sourceType, colIdx) {
+    let card;
+    if (sourceType === 'waste') {
+        if (!waste.length) return;
+        card = waste[waste.length - 1];
+    } else {
+        const col = tableau[colIdx];
+        if (!col.length) return;
+        card = col[col.length - 1];
+        if (!card.faceUp) return;
+    }
+    const s = autoFoundationSuit(card);
+    if (!s) return;
+    if (sourceType === 'waste') waste.pop();
+    else { tableau[colIdx].pop(); flipExposedTableauTop(colIdx); }
+    foundations[s].push(card);
+    moves++;
+    selected = null;
+    render();
+    checkWin();
+}
+
+function checkWin() {
+    const total = SUITS.reduce((sum, s) => sum + foundations[s].length, 0);
+    if (total === 52) {
+        gameWon = true;
+        msg('🎉 Hai vinto! Tutte le carte in fondamenta in ' + moves + ' mosse.', 'win');
+    }
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────────
+function render() {
+    document.getElementById('sc-stock').textContent = stock.length;
+    document.getElementById('sc-moves').textContent = moves;
+
+    const stockEl = document.getElementById('stock-pile');
+    stockEl.innerHTML = '';
+    if (stock.length > 0) {
+        const el = cardEl({}, false);
+        el.onclick = onStockClick;
+        stockEl.appendChild(el);
+    } else {
+        const ph = document.createElement('div');
+        ph.className = 'card placeholder';
+        ph.textContent = '↺';
+        ph.onclick = onStockClick;
+        stockEl.appendChild(ph);
+    }
+
+    const wasteEl = document.getElementById('waste-pile');
+    wasteEl.innerHTML = '';
+    if (waste.length > 0) {
+        const top = waste[waste.length - 1];
+        const el = cardEl(top, true);
+        if (selected && selected.source === 'waste') el.classList.add('selected');
+        el.onclick = selectWasteTop;
+        el.ondblclick = () => dblClickAutoFoundation('waste');
+        wasteEl.appendChild(el);
+    } else {
+        const ph = document.createElement('div');
+        ph.className = 'card placeholder';
+        wasteEl.appendChild(ph);
+    }
+
+    for (const s of SUITS) {
+        const el = document.getElementById('found-' + s);
+        el.innerHTML = '';
+        const arr = foundations[s];
+        let cardDiv;
+        if (arr.length > 0) {
+            cardDiv = cardEl(arr[arr.length - 1], true);
+        } else {
+            cardDiv = document.createElement('div');
+            cardDiv.className = 'card placeholder';
+            cardDiv.textContent = SYMS[s];
+            cardDiv.style.color = isRedSuit(s) ? '#c0392b' : '#888';
+        }
+        cardDiv.onclick = () => onFoundationClick(s);
+        el.appendChild(cardDiv);
+    }
+
+    for (let c = 0; c < 7; c++) {
+        const colEl = document.getElementById('col-' + c);
+        colEl.innerHTML = '';
+        const col = tableau[c];
+        if (col.length === 0) {
+            const ph = document.createElement('div');
+            ph.className = 'card placeholder';
+            ph.style.position = 'absolute';
+            ph.onclick = () => onTableauCardClick(c, -1);
+            colEl.appendChild(ph);
+            continue;
+        }
+        let top = 0;
+        col.forEach((card, i) => {
+            const el = cardEl(card, card.faceUp);
+            el.style.position = 'absolute';
+            el.style.left = '0';
+            el.style.top = top + 'px';
+            if (selected && selected.source === 'tableau' && selected.col === c && i >= selected.startIndex) {
+                el.classList.add('selected');
+            }
+            el.onclick = () => onTableauCardClick(c, i);
+            if (i === col.length - 1) el.ondblclick = () => dblClickAutoFoundation('tableau', c);
+            colEl.appendChild(el);
+            top += card.faceUp ? OFFSET_UP : OFFSET_DOWN;
+        });
+    }
+}
+
+function msg(txt, type) {
+    const el = document.getElementById('message-bar');
+    el.textContent = txt;
+    el.className = 'message-bar' + (type === true ? ' warn' : (type === 'win' ? ' win' : ''));
+}
+
+function askNewGame() { document.getElementById('confirmModal').classList.add('active'); }
+function closeModal() { document.getElementById('confirmModal').classList.remove('active'); }
+function confirmNewGame() { closeModal(); initGame(); }
+document.getElementById('confirmModal').addEventListener('click', function(e){ if (e.target === this) closeModal(); });
+
+function toggleRules() {
+    const rb = document.getElementById('rules-box');
+    rb.style.display = rb.style.display === 'block' ? 'none' : 'block';
+}
+
+initGame();
+</script>
+</body>
+</html>

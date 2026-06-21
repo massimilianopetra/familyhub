@@ -379,7 +379,40 @@ const GAMES = [
   { id: 'backgammon',  icon: '▲▽', title: 'Backgammon',    desc: 'Sposta le pedine e porta tutte a casa per primo.',     color: '#0d9488' },
   { id: 'forza4',      icon: '🟡', title: 'Forza 4',       desc: 'Allinea 4 pedine in fila prima del tuo avversario.',   color: '#2563eb' },
   { id: 'dama',        icon: '♛', title: 'Dama',          desc: 'Dama italiana classica: cattura o blocca l\'avversario.', color: '#8b2e2e' },
+  { id: '2048',        icon: '🔢', title: '2048',          desc: 'Unisci le tessere fino a raggiungere 2048.',           color: '#edc22e' },
+  { id: 'solitari',    icon: '🂡', title: 'Solitari',      desc: 'Klondike, FreeCell, Pyramid, Spider e altri.',         color: '#475569' },
 ]
+
+const SOLITAIRES = [
+  { id: 'klondike', icon: '🂡', title: 'Klondike', desc: 'Il solitario classico: fondamenta per seme, pesca dal mazzo.', color: '#16a34a' },
+  { id: 'freecell', icon: '🂮', title: 'FreeCell',  desc: '4 celle libere, quasi sempre risolvibile.',                   color: '#0ea5e9' },
+  { id: 'pyramid',  icon: '🔺', title: 'Pyramid',   desc: 'Abbina coppie di carte che sommano a 13.',                    color: '#d97706' },
+  { id: 'spider',   icon: '🕷️', title: 'Spider',    desc: '2 mazzi, colonne lunghe, più strategico.',                    color: '#7c3aed' },
+]
+
+function SolitaireMenu({ onBack, onSelect }) {
+  return (
+    <div style={homeS.wrapper}>
+      <div style={gS.gameBar}>
+        <button style={gS.backBtn} onClick={onBack}>◀ Giochi</button>
+        <span style={{ fontWeight: 'bold' }}>🂡 Solitari</span>
+        <div style={{ width: '60px' }} />
+      </div>
+      <div style={homeS.grid}>
+        {SOLITAIRES.map((g) => (
+          <div key={g.id} style={homeS.card}>
+            <div style={homeS.cardIcon}>{g.icon}</div>
+            <h3 style={homeS.cardTitle}>{g.title}</h3>
+            <p style={homeS.cardDesc}>{g.desc}</p>
+            <button style={{ ...homeS.cardBtn, backgroundColor: g.color }} onClick={() => onSelect(g.id)}>
+              Gioca Ora
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function GamesSection() {
   const [active, setActive] = useState(null)
@@ -396,6 +429,12 @@ export default function GamesSection() {
   if (active === 'backgammon') return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/backgammon.html`}   title="Backgammon"   icon="▲▽" />
   if (active === 'forza4')     return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/forza4.html`}       title="Forza 4"      icon="🟡" />
   if (active === 'dama')       return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/dama.html`}         title="Dama"         icon="♛" />
+  if (active === '2048')       return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/2048.html`}         title="2048"         icon="🔢" />
+  if (active === 'solitari')   return <SolitaireMenu onBack={() => setActive(null)} onSelect={setActive} />
+  if (active === 'klondike')   return <IframeGame onBack={() => setActive('solitari')} src={`${import.meta.env.BASE_URL}giochi/klondike.html`} title="Klondike" icon="🂡" />
+  if (active === 'freecell')   return <IframeGame onBack={() => setActive('solitari')} src={`${import.meta.env.BASE_URL}giochi/freecell.html`} title="FreeCell" icon="🂮" />
+  if (active === 'pyramid')    return <IframeGame onBack={() => setActive('solitari')} src={`${import.meta.env.BASE_URL}giochi/pyramid.html`}  title="Pyramid"  icon="🔺" />
+  if (active === 'spider')     return <IframeGame onBack={() => setActive('solitari')} src={`${import.meta.env.BASE_URL}giochi/spider.html`}   title="Spider"   icon="🕷️" />
 
   return (
     <div style={homeS.wrapper}>

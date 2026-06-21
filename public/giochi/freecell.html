@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>FreeCell</title>
+    <link rel="stylesheet" href="cards-common.css">
+    <style>
+        :root { --card-w: 42px; --card-h: 62px; }
+        .top-row { display: flex; gap: 6px; margin-bottom: 10px; }
+        .freecells { display: flex; gap: 6px; }
+        .foundations { display: flex; gap: 6px; margin-left: auto; }
+        .tableau { display: flex; gap: 4px; }
+        .column { position: relative; flex: 1; min-height: 320px; }
+        .card.placeholder { display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+<h1>FreeCell</h1>
+<div class="subtitle">4 celle libere — quasi sempre risolvibile</div>
+
+<div class="game-container">
+    <div class="score-strip">
+        <div class="score-chip">Mosse <span id="sc-moves">0</span></div>
+        <div class="score-chip">Celle libere <span id="sc-free">4</span></div>
+    </div>
+
+    <div class="message-bar" id="message-bar">Tocca una carta per selezionarla, poi la destinazione.</div>
+
+    <div class="top-row">
+        <div class="freecells">
+            <div id="cell-0"></div>
+            <div id="cell-1"></div>
+            <div id="cell-2"></div>
+            <div id="cell-3"></div>
+        </div>
+        <div class="foundations">
+            <div id="found-spade"></div>
+            <div id="found-cuori"></div>
+            <div id="found-quadri"></div>
+            <div id="found-fiori"></div>
+        </div>
+    </div>
+
+    <div class="tableau">
+        <div class="column" id="col-0"></div>
+        <div class="column" id="col-1"></div>
+        <div class="column" id="col-2"></div>
+        <div class="column" id="col-3"></div>
+        <div class="column" id="col-4"></div>
+        <div class="column" id="col-5"></div>
+        <div class="column" id="col-6"></div>
+        <div class="column" id="col-7"></div>
+    </div>
+
+    <div class="action-buttons">
+        <button id="btn-reset" class="action" onclick="askNewGame()">Nuova Partita</button>
+    </div>
+
+    <div class="rules-toggle">
+        <button onclick="toggleRules()">📖 Regole</button>
+        <div class="rules-box" id="rules-box">
+            <strong>Obiettivo:</strong> spostare tutte le 52 carte sulle 4 fondamenta, una per seme, in ordine crescente da Asso a Re.<br><br>
+            <strong>Tutte le carte sono scoperte</strong> fin dall'inizio — niente carte coperte da scoprire.<br><br>
+            <strong>Celle libere:</strong> 4 celle dove puoi parcheggiare temporaneamente una carta qualsiasi.<br><br>
+            <strong>Tableau:</strong> appoggia una carta su una di valore immediatamente superiore e colore opposto, oppure su una colonna vuota (qualsiasi carta).<br><br>
+            <strong>Spostare più carte insieme:</strong> puoi muovere una sequenza solo se hai abbastanza celle libere per "tenerle" temporaneamente (servono almeno N−1 celle libere per spostare N carte insieme).<br><br>
+            <strong>Fondamenta:</strong> doppio click su una carta in cima a una colonna o in una cella per mandarla automaticamente in fondamenta, se possibile.
+        </div>
+    </div>
+</div>
+
+<div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-icon">🂮</div>
+        <h2 class="modal-title">Nuova Partita?</h2>
+        <p class="modal-msg">La partita corrente andrà persa. Continuare?</p>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-cancel"  onclick="closeModal()">Annulla</button>
+            <button class="modal-btn modal-btn-confirm" onclick="confirmNewGame()">Sì!</button>
+        </div>
+    </div>
+</div>
+
+<script src="cards-common.js"></script>
+<script>
+const OFFSET = 20;
+let tableau, freecells, foundations, selected, moves, gameWon;
+
+function initGame() {
+    const deck = shuffleDeck(buildDeck());
+    tableau = Array.from({ length: 8 }, () => []);
+    let idx = 0;
+    for (let c = 0; c < 8; c++) {
+        const n = c < 4 ? 7 : 6;
+        for (let i = 0; i < n; i++) tableau[c].push({ ...deck[idx++], faceUp: true });
+    }
+    freecells = [null, null, null, null];
+    foundations = { spade: [], cuori: [], quadri: [], fiori: [] };
+    selected = null;
+    moves = 0;
+    gameWon = false;
+    msg('Tocca una carta per selezionarla, poi la destinazione.', false);
+    render();
+}
+
+function emptyFreeCells() { return freecells.filter(c => c === null).length; }
+
+function getMovableRun(col, index) {
+    if (index < 0 || index >= col.length) return null;
+    for (let i = index; i < col.length - 1; i++) {
+        const a = col[i], b = col[i + 1];
+        if (!(isAlternateColor(a, b) && valueRank(a.value) === valueRank(b.value) + 1)) return null;
+    }
+    return col.slice(index);
+}
+
+function canDropOnTableau(card, destCol) {
+    if (destCol.length === 0) return true;
+    const top = destCol[destCol.length - 1];
+    return isAlternateColor(card, top) && valueRank(card.value) === valueRank(top.value) - 1;
+}
+
+function canDropOnFoundation(card, suit) {
+    if (card.suit !== suit) return false;
+    const arr = foundations[suit];
+    if (arr.length === 0) return card.value === 'A';
+    return valueRank(card.value) === valueRank(arr[arr.length - 1].value) + 1;
+}
+
+function autoFoundationSuit(card) {
+    for (const s of SUITS) if (canDropOnFoundation(card, s)) return s;
+    return null;
+}
+
+function removeSelectedFromSource() {
+    if (selected.source === 'freecell') freecells[selected.cellIdx] = null;
+    else tableau[selected.col].splice(selected.startIndex);
+}
+
+function finishMove() {
+    moves++;
+    selected = null;
+    render();
+    checkWin();
+}
+
+function tryDropOnTableau(colIdx) {
+    if (!selected) return false;
+    const cards = selected.cards;
+    if (cards.length > 1 && cards.length - 1 > emptyFreeCells()) return false;
+    if (!canDropOnTableau(cards[0], tableau[colIdx])) return false;
+    removeSelectedFromSource();
+    for (const c of cards) tableau[colIdx].push(c);
+    finishMove();
+    return true;
+}
+
+function tryDropOnFreeCell(cellIdx) {
+    if (!selected || freecells[cellIdx] !== null) return false;
+    if (selected.cards.length !== 1) { msg('Una cella libera può contenere solo una carta.', true); return false; }
+    removeSelectedFromSource();
+    freecells[cellIdx] = selected.cards[0];
+    finishMove();
+    return true;
+}
+
+function tryDropOnFoundation(suit) {
+    if (!selected || selected.cards.length !== 1 || !canDropOnFoundation(selected.cards[0], suit)) return false;
+    const card = selected.cards[0];
+    removeSelectedFromSource();
+    foundations[suit].push(card);
+    finishMove();
+    return true;
+}
+
+function onFreeCellClick(i) {
+    if (selected) {
+        if (tryDropOnFreeCell(i)) return;
+        if (selected.source === 'freecell' && selected.cellIdx === i) { selected = null; render(); return; }
+        msg('Mossa non valida.', true);
+        selected = null;
+        render();
+        return;
+    }
+    if (freecells[i] === null) return;
+    selected = { source: 'freecell', cellIdx: i, cards: [freecells[i]] };
+    render();
+}
+
+function onFoundationClick(suit) {
+    if (!selected) return;
+    if (!tryDropOnFoundation(suit)) {
+        msg('Mossa non valida.', true);
+        selected = null;
+        render();
+    }
+}
+
+function onTableauCardClick(colIdx, cardIdx) {
+    const col = tableau[colIdx];
+    const clickedExisting = cardIdx >= 0 && cardIdx < col.length;
+
+    if (selected) {
+        if (tryDropOnTableau(colIdx)) return;
+        if (selected.source === 'tableau' && selected.col === colIdx && clickedExisting && cardIdx === selected.startIndex) {
+            selected = null; render(); return;
+        }
+        if (clickedExisting) {
+            const run = getMovableRun(col, cardIdx);
+            if (run && (run.length === 1 || run.length - 1 <= emptyFreeCells())) {
+                selected = { source: 'tableau', col: colIdx, startIndex: cardIdx, cards: run };
+                render();
+                return;
+            }
+        }
+        msg('Mossa non valida.', true);
+        selected = null;
+        render();
+        return;
+    }
+
+    if (!clickedExisting) return;
+    const run = getMovableRun(col, cardIdx);
+    if (!run) { msg('Quella sequenza non è ordinata: puoi spostare solo l\'ultima carta.', true); return; }
+    if (run.length > 1 && run.length - 1 > emptyFreeCells()) {
+        msg('Non hai celle libere sufficienti per spostare ' + run.length + ' carte insieme (servono ' + (run.length - 1) + ' celle libere).', true);
+        return;
+    }
+    selected = { source: 'tableau', col: colIdx, startIndex: cardIdx, cards: run };
+    render();
+}
+
+function dblClickAutoFoundation(sourceType, idx) {
+    let card;
+    if (sourceType === 'freecell') { card = freecells[idx]; if (!card) return; }
+    else { const col = tableau[idx]; if (!col.length) return; card = col[col.length - 1]; }
+    const s = autoFoundationSuit(card);
+    if (!s) return;
+    if (sourceType === 'freecell') freecells[idx] = null;
+    else tableau[idx].pop();
+    foundations[s].push(card);
+    moves++;
+    selected = null;
+    render();
+    checkWin();
+}
+
+function checkWin() {
+    const total = SUITS.reduce((sum, s) => sum + foundations[s].length, 0);
+    if (total === 52) {
+        gameWon = true;
+        msg('🎉 Hai vinto! Tutte le carte in fondamenta in ' + moves + ' mosse.', 'win');
+    }
+}
+
+function render() {
+    document.getElementById('sc-moves').textContent = moves;
+    document.getElementById('sc-free').textContent = emptyFreeCells();
+
+    for (let i = 0; i < 4; i++) {
+        const el = document.getElementById('cell-' + i);
+        el.innerHTML = '';
+        let cardDiv;
+        if (freecells[i]) {
+            cardDiv = cardEl(freecells[i], true);
+            if (selected && selected.source === 'freecell' && selected.cellIdx === i) cardDiv.classList.add('selected');
+            cardDiv.ondblclick = () => dblClickAutoFoundation('freecell', i);
+        } else {
+            cardDiv = document.createElement('div');
+            cardDiv.className = 'card placeholder';
+        }
+        cardDiv.onclick = () => onFreeCellClick(i);
+        el.appendChild(cardDiv);
+    }
+
+    for (const s of SUITS) {
+        const el = document.getElementById('found-' + s);
+        el.innerHTML = '';
+        const arr = foundations[s];
+        let cardDiv;
+        if (arr.length > 0) {
+            cardDiv = cardEl(arr[arr.length - 1], true);
+        } else {
+            cardDiv = document.createElement('div');
+            cardDiv.className = 'card placeholder';
+            cardDiv.textContent = SYMS[s];
+            cardDiv.style.color = isRedSuit(s) ? '#c0392b' : '#888';
+        }
+        cardDiv.onclick = () => onFoundationClick(s);
+        el.appendChild(cardDiv);
+    }
+
+    for (let c = 0; c < 8; c++) {
+        const colEl = document.getElementById('col-' + c);
+        colEl.innerHTML = '';
+        const col = tableau[c];
+        if (col.length === 0) {
+            const ph = document.createElement('div');
+            ph.className = 'card placeholder';
+            ph.style.position = 'absolute';
+            ph.onclick = () => onTableauCardClick(c, -1);
+            colEl.appendChild(ph);
+            continue;
+        }
+        col.forEach((card, i) => {
+            const el = cardEl(card, true);
+            el.style.position = 'absolute';
+            el.style.left = '0';
+            el.style.top = (i * OFFSET) + 'px';
+            if (selected && selected.source === 'tableau' && selected.col === c && i >= selected.startIndex) {
+                el.classList.add('selected');
+            }
+            el.onclick = () => onTableauCardClick(c, i);
+            if (i === col.length - 1) el.ondblclick = () => dblClickAutoFoundation('tableau', c);
+            colEl.appendChild(el);
+        });
+    }
+}
+
+function msg(txt, type) {
+    const el = document.getElementById('message-bar');
+    el.textContent = txt;
+    el.className = 'message-bar' + (type === true ? ' warn' : (type === 'win' ? ' win' : ''));
+}
+
+function askNewGame() { document.getElementById('confirmModal').classList.add('active'); }
+function closeModal() { document.getElementById('confirmModal').classList.remove('active'); }
+function confirmNewGame() { closeModal(); initGame(); }
+document.getElementById('confirmModal').addEventListener('click', function(e){ if (e.target === this) closeModal(); });
+
+function toggleRules() {
+    const rb = document.getElementById('rules-box');
+    rb.style.display = rb.style.display === 'block' ? 'none' : 'block';
+}
+
+initGame();
+</script>
+</body>
+</html>

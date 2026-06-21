@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Pyramid</title>
+    <link rel="stylesheet" href="cards-common.css">
+    <style>
+        :root { --card-w: 40px; --card-h: 58px; }
+        .pyramid { display: flex; flex-direction: column; align-items: center; margin-bottom: 8px; }
+        .pyramid-row { display: flex; gap: 4px; margin-top: -16px; }
+        .pyramid-row:first-child { margin-top: 0; }
+        .card.covered { opacity: 0.45; cursor: default; }
+        .card.removed-slot { visibility: hidden; }
+        .stock-row { display: flex; gap: 8px; align-items: center; justify-content: center; margin-bottom: 8px; }
+        .pile-label { font-size: 0.62rem; color: #a0a2b1; text-align: center; margin-top: 3px; }
+        .pile-group { display: flex; flex-direction: column; align-items: center; }
+    </style>
+</head>
+<body>
+<h1>Pyramid</h1>
+<div class="subtitle">Abbina coppie di carte che sommano a 13</div>
+
+<div class="game-container">
+    <div class="score-strip">
+        <div class="score-chip">Rimaste <span id="sc-remaining">28</span></div>
+        <div class="score-chip">Mazzo <span id="sc-stock">24</span></div>
+    </div>
+
+    <div class="message-bar" id="message-bar">Tocca una carta scoperta, poi un'altra che sommi a 13 (Re da solo).</div>
+
+    <div class="pyramid" id="pyramid"></div>
+
+    <div class="stock-row">
+        <div class="pile-group"><div id="stock-pile"></div><div class="pile-label">Mazzo</div></div>
+        <div class="pile-group"><div id="waste-pile"></div><div class="pile-label">Scarti</div></div>
+    </div>
+
+    <div class="action-buttons">
+        <button id="btn-reset" class="action" onclick="askNewGame()">Nuova Partita</button>
+    </div>
+
+    <div class="rules-toggle">
+        <button onclick="toggleRules()">📖 Regole</button>
+        <div class="rules-box" id="rules-box">
+            <strong>Obiettivo:</strong> rimuovere tutte le 28 carte della piramide.<br><br>
+            <strong>Valori:</strong> A=1, 2-10 come scritto, J=11, Q=12, K=13.<br><br>
+            <strong>Coppie:</strong> tocca due carte scoperte (anche una dagli scarti) la cui somma fa 13, per rimuoverle entrambe. Il Re (13) si rimuove da solo con un tocco.<br><br>
+            <strong>Carte scoperte:</strong> una carta della piramide è giocabile solo quando le due carte che la sostengono nella fila sotto sono state rimosse. L'ultima fila è sempre scoperta.<br><br>
+            <strong>Mazzo/Scarti:</strong> tocca il mazzo per pescare negli scarti. Quando il mazzo è vuoto, toccalo per rimescolare gli scarti (senza limiti, per semplicità).
+        </div>
+    </div>
+</div>
+
+<div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-icon">🔺</div>
+        <h2 class="modal-title">Nuova Partita?</h2>
+        <p class="modal-msg">La partita corrente andrà persa. Continuare?</p>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-cancel"  onclick="closeModal()">Annulla</button>
+            <button class="modal-btn modal-btn-confirm" onclick="confirmNewGame()">Sì!</button>
+        </div>
+    </div>
+</div>
+
+<script src="cards-common.js"></script>
+<script>
+let pyramid, stock, waste, selected, gameWon;
+
+function initGame() {
+    const deck = shuffleDeck(buildDeck());
+    pyramid = [];
+    let idx = 0;
+    for (let r = 0; r < 7; r++) {
+        const row = [];
+        for (let j = 0; j <= r; j++) { row.push({ ...deck[idx++], removed: false }); }
+        pyramid.push(row);
+    }
+    stock = deck.slice(idx);
+    waste = [];
+    selected = null;
+    gameWon = false;
+    msg('Tocca una carta scoperta, poi un\'altra che sommi a 13 (Re da solo).', false);
+    render();
+}
+
+function isExposed(i, j) {
+    if (pyramid[i][j].removed) return false;
+    if (i === 6) return true;
+    return pyramid[i + 1][j].removed && pyramid[i + 1][j + 1].removed;
+}
+
+function remainingCount() {
+    let n = 0;
+    for (const row of pyramid) for (const c of row) if (!c.removed) n++;
+    return n;
+}
+
+function selectCard(ref) {
+    // ref = { kind:'pyramid', i, j, card } oppure { kind:'waste', card }
+    if (ref.card.value === 'K' || valueRank(ref.card.value) === 13) {
+        removeCards([ref]);
+        return;
+    }
+    if (!selected) {
+        selected = ref;
+        render();
+        return;
+    }
+    const sameCard = selected.kind === ref.kind &&
+        (selected.kind === 'waste' || (selected.i === ref.i && selected.j === ref.j));
+    if (sameCard) { selected = null; render(); return; }
+
+    if (valueRank(selected.card.value) + valueRank(ref.card.value) === 13) {
+        removeCards([selected, ref]);
+    } else {
+        msg('Quelle due carte non sommano a 13.', true);
+        selected = ref;
+        render();
+    }
+}
+
+function removeCards(refs) {
+    for (const ref of refs) {
+        if (ref.kind === 'pyramid') pyramid[ref.i][ref.j].removed = true;
+        else waste.pop();
+    }
+    selected = null;
+    render();
+    checkWin();
+}
+
+function onStockClick() {
+    if (gameWon) return;
+    if (stock.length > 0) {
+        waste.push(stock.pop());
+    } else if (waste.length > 0) {
+        while (waste.length) stock.push(waste.pop());
+    }
+    selected = null;
+    render();
+}
+
+function hasAnyMove() {
+    const exposedRefs = [];
+    for (let i = 0; i < 7; i++) for (let j = 0; j <= i; j++) if (isExposed(i, j)) exposedRefs.push({ kind: 'pyramid', i, j, card: pyramid[i][j] });
+    if (waste.length > 0) exposedRefs.push({ kind: 'waste', card: waste[waste.length - 1] });
+    for (const r of exposedRefs) if (valueRank(r.card.value) === 13) return true;
+    for (let a = 0; a < exposedRefs.length; a++) {
+        for (let b = a + 1; b < exposedRefs.length; b++) {
+            if (valueRank(exposedRefs[a].card.value) + valueRank(exposedRefs[b].card.value) === 13) return true;
+        }
+    }
+    return stock.length > 0 || waste.length > 0;
+}
+
+function checkWin() {
+    if (remainingCount() === 0) {
+        gameWon = true;
+        msg('🎉 Piramide completata! Hai vinto!', 'win');
+    } else if (!hasAnyMove()) {
+        msg('Nessuna mossa possibile. Premi Nuova Partita per riprovare.', true);
+    }
+}
+
+function render() {
+    document.getElementById('sc-remaining').textContent = remainingCount();
+    document.getElementById('sc-stock').textContent = stock.length;
+
+    const pyrEl = document.getElementById('pyramid');
+    pyrEl.innerHTML = '';
+    for (let i = 0; i < 7; i++) {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'pyramid-row';
+        for (let j = 0; j <= i; j++) {
+            const cell = pyramid[i][j];
+            if (cell.removed) {
+                const ph = document.createElement('div');
+                ph.className = 'card removed-slot';
+                rowEl.appendChild(ph);
+                continue;
+            }
+            const exposed = isExposed(i, j);
+            const el = cardEl(cell, true);
+            if (!exposed) el.classList.add('covered');
+            if (selected && selected.kind === 'pyramid' && selected.i === i && selected.j === j) el.classList.add('selected');
+            if (exposed) el.onclick = () => selectCard({ kind: 'pyramid', i, j, card: cell });
+            rowEl.appendChild(el);
+        }
+        pyrEl.appendChild(rowEl);
+    }
+
+    const stockEl = document.getElementById('stock-pile');
+    stockEl.innerHTML = '';
+    if (stock.length > 0) {
+        const el = cardEl({}, false);
+        el.onclick = onStockClick;
+        stockEl.appendChild(el);
+    } else {
+        const ph = document.createElement('div');
+        ph.className = 'card placeholder';
+        ph.textContent = '↺';
+        ph.onclick = onStockClick;
+        stockEl.appendChild(ph);
+    }
+
+    const wasteEl = document.getElementById('waste-pile');
+    wasteEl.innerHTML = '';
+    if (waste.length > 0) {
+        const top = waste[waste.length - 1];
+        const el = cardEl(top, true);
+        if (selected && selected.kind === 'waste') el.classList.add('selected');
+        el.onclick = () => selectCard({ kind: 'waste', card: top });
+        wasteEl.appendChild(el);
+    } else {
+        const ph = document.createElement('div');
+        ph.className = 'card placeholder';
+        wasteEl.appendChild(ph);
+    }
+}
+
+function msg(txt, type) {
+    const el = document.getElementById('message-bar');
+    el.textContent = txt;
+    el.className = 'message-bar' + (type === true ? ' warn' : (type === 'win' ? ' win' : ''));
+}
+
+function askNewGame() { document.getElementById('confirmModal').classList.add('active'); }
+function closeModal() { document.getElementById('confirmModal').classList.remove('active'); }
+function confirmNewGame() { closeModal(); initGame(); }
+document.getElementById('confirmModal').addEventListener('click', function(e){ if (e.target === this) closeModal(); });
+
+function toggleRules() {
+    const rb = document.getElementById('rules-box');
+    rb.style.display = rb.style.display === 'block' ? 'none' : 'block';
+}
+
+initGame();
+</script>
+</body>
+</html>
