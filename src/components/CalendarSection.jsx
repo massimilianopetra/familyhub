@@ -134,7 +134,7 @@ function EventChipMobile({ event }) {
 }
 
 // ── Card evento DB (vista settimana/giorno) ────────────────────
-function EventCard({ event, detailed, isOwner, onEdit }) {
+function EventCard({ event, detailed, isOwner, onEdit, onToggleComplete }) {
   const { emoji, label: typeLabel, color } = getEventType(event.event_type)
   const overdue = event.is_deadline && !event.completed
   const times = event.start_time
@@ -155,12 +155,22 @@ function EventCard({ event, detailed, isOwner, onEdit }) {
         <span style={{ fontSize: detailed ? '0.95rem' : '0.72rem', fontWeight:'700', color:'#f1f5f9', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration: event.completed ? 'line-through' : 'none' }}>
           {overdue ? '⏰ ' : ''}{emoji} {event.title}
         </span>
-        {isOwner && (
-          <button onClick={e => { e.stopPropagation(); onEdit(event) }}
-            style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:'0.85rem', padding:'0 2px', lineHeight:1, flexShrink:0 }}>
-            ✏️
-          </button>
-        )}
+        <div style={{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 }}>
+          {detailed && event.is_deadline && isOwner && onToggleComplete && (
+            <button onClick={e => { e.stopPropagation(); onToggleComplete(event) }}
+              style={{ background:'none', border:`1px solid ${event.completed ? '#4ade80' : '#ef4444'}`,
+                borderRadius:'20px', padding:'2px 8px', fontSize:'0.68rem', fontWeight:'700',
+                color: event.completed ? '#4ade80' : '#ef4444', cursor:'pointer', whiteSpace:'nowrap' }}>
+              {event.completed ? '↺ Riapri' : '✓ Completa'}
+            </button>
+          )}
+          {isOwner && (
+            <button onClick={e => { e.stopPropagation(); onEdit(event) }}
+              style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:'0.85rem', padding:'0 2px', lineHeight:1 }}>
+              ✏️
+            </button>
+          )}
+        </div>
       </div>
       <span style={{ fontSize: detailed ? '0.88rem' : '0.73rem', color, fontWeight:'600' }}>
         {times ?? 'Tutto il giorno'}
@@ -609,7 +619,7 @@ function WeekView({ monday, shifts, showShifts, dbEvents, currentUserId, onDayCl
 // ══════════════════════════════════════════════════════════════
 // VISTA GIORNO
 // ══════════════════════════════════════════════════════════════
-function DayView({ day, shifts, showShifts, dbEvents, currentUserId, onAddEvent, onEditEvent }) {
+function DayView({ day, shifts, showShifts, dbEvents, currentUserId, onAddEvent, onEditEvent, onToggleComplete }) {
   const today     = new Date()
   const isToday   = isSameDay(day, today)
   const dayShifts = shifts.filter(s => isSameDay(s.date, day))
@@ -654,7 +664,7 @@ function DayView({ day, shifts, showShifts, dbEvents, currentUserId, onAddEvent,
           Eventi
         </div>
         {dayEvents.length > 0
-          ? dayEvents.map(e => <EventCard key={e.id} event={e} detailed={true} isOwner={e.user_id===currentUserId} onEdit={onEditEvent} />)
+          ? dayEvents.map(e => <EventCard key={e.id} event={e} detailed={true} isOwner={e.user_id===currentUserId} onEdit={onEditEvent} onToggleComplete={onToggleComplete} />)
           : (
             <div style={{ backgroundColor:'#1e293b', border:'1px dashed #334155', borderRadius:'10px',
               padding:'20px', textAlign:'center', color:'#475569', fontSize:'0.9rem' }}>
@@ -693,6 +703,17 @@ export default function CalendarSection({ session }) {
   async function deleteEvent(id) {
     await supabase.from('calendar_events').delete().eq('id', id)
     setDbEvents(prev => prev.filter(e => e.id !== id))
+  }
+
+  async function toggleCompleted(event) {
+    const completed    = !event.completed
+    const completed_at = completed ? new Date().toISOString().slice(0,10) : null
+    const { error } = await supabase.from('calendar_events')
+      .update({ completed, completed_at })
+      .eq('id', event.id)
+    if (!error) {
+      setDbEvents(prev => prev.map(e => e.id === event.id ? { ...e, completed, completed_at } : e))
+    }
   }
 
   const filteredEvents = useMemo(() =>
@@ -784,6 +805,7 @@ export default function CalendarSection({ session }) {
           currentUserId={currentUserId}
           onAddEvent={() => setAddModal(currentDate)}
           onEditEvent={e => setEditModal(e)}
+          onToggleComplete={toggleCompleted}
         />
       )}
 

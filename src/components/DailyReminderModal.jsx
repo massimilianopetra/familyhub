@@ -141,9 +141,9 @@ export default function DailyReminderModal({ session, forceTrigger }) {
                       </div>
                     </div>
                     <button onClick={() => markDeadlineDone(e.id)}
-                      style={{ background: 'none', border: '1px solid #4ade80', borderRadius: '20px', padding: '3px 10px',
-                        fontSize: '0.7rem', fontWeight: '700', color: '#4ade80', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      ✓ Fatto
+                      style={{ background: 'none', border: '1px solid #ef4444', borderRadius: '20px', padding: '3px 10px',
+                        fontSize: '0.7rem', fontWeight: '700', color: '#ef4444', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      ✓ Completa
                     </button>
                   </div>
                 )
