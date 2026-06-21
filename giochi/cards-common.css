@@ -61,11 +61,11 @@ h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size:
 .card .c-bot { align-self: flex-end; line-height: 1.05; font-size: calc(var(--card-w) * 0.16); transform: rotate(180deg); }
 .pip-grid {
     position: absolute;
-    top: calc(var(--card-w) * 0.42); bottom: calc(var(--card-w) * 0.42);
-    left: calc(var(--card-w) * 0.14); right: calc(var(--card-w) * 0.14);
+    top: calc(var(--card-w) * 0.52); bottom: calc(var(--card-w) * 0.52);
+    left: calc(var(--card-w) * 0.20); right: calc(var(--card-w) * 0.20);
     display: grid; grid-template-rows: repeat(5, 1fr); grid-template-columns: repeat(3, 1fr);
 }
-.pip { display: flex; align-items: center; justify-content: center; font-size: calc(var(--card-w) * 0.15); line-height: 1; }
+.pip { display: flex; align-items: center; justify-content: center; font-size: calc(var(--card-w) * 0.13); line-height: 1; }
 .pip.rot { transform: rotate(180deg); }
 .card.hidden { background: #2a2c48; border: 1px solid #3e4060; cursor: pointer; }
 .card.hidden::after { content: ''; position: absolute; inset: 4px; border: 1px solid #4a4c68; border-radius: 4px; }
