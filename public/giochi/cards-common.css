@@ -10,6 +10,10 @@ body { font-family: sans-serif; background: var(--bg); color: var(--text); margi
 h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size: 1rem; }
 .subtitle { margin-bottom: 6px; color: #a0a2b1; font-size: 0.7rem; text-align: center; }
 .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 440px; }
+@media (min-width: 700px) {
+    :root { --card-w: 68px; --card-h: 100px; }
+    .game-container { max-width: 640px; }
+}
 
 .score-strip { display: flex; gap: 5px; margin-bottom: 5px; }
 .score-chip { flex: 1; background: var(--empty); border-radius: 5px; padding: 4px 6px; text-align: center; font-size: 0.63rem; color: #a0a2b1; }

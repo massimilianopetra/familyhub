@@ -155,6 +155,13 @@
             border: 1px solid #000;
         }
 
+        @media (min-width: 700px) {
+            .game-container { max-width: 640px; }
+            .peg { width: 43px; height: 43px; }
+            .hints { width: 46px; height: 46px; }
+            .hint-dot { width: 13px; height: 13px; }
+        }
+
         /* Pioli Chiave Originali */
         .hint-dot.black { background-color: #000000; border-color: #333; } /* Posizione + Colore OK */
         .hint-dot.white { background-color: #ffffff; border-color: #ccc; } /* Solo Colore OK */
