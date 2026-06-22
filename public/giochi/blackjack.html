@@ -37,20 +37,20 @@
 
         .card {
             width: 54px; height: 82px;
-            background: #f0ede6; border-radius: 8px; border: 1px solid #bbb;
-            display: flex; flex-direction: column; justify-content: space-between;
-            padding: 4px 5px; font-weight: 700;
+            background-color: #f0ede6; border-radius: 8px; border: 1px solid #bbb;
             position: relative; flex-shrink: 0;
             box-shadow: 0 3px 8px rgba(0,0,0,0.55);
-            font-family: 'Courier New', Courier, monospace;
+            background-repeat: no-repeat;
         }
-        .card.red   { color: #c0392b; }
-        .card.black { color: #1a1b2e; }
-        .card .c-top { align-self: flex-start; line-height: 1.15; font-size: 11px; }
-        .card .c-mid { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 20px; line-height: 1; }
-        .card .c-bot { align-self: flex-end; line-height: 1.15; font-size: 11px; transform: rotate(180deg); }
-        .card.hidden { background: #2a2c48; border: 1px solid #3e4060; }
-        .card.hidden::after { content: '?'; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 26px; color: #4a4c68; font-weight: 700; }
+        .card.faceup {
+            background-image: url('assets/cards-sprite.png');
+            background-size: 1300% 400%;
+        }
+        .card.hidden {
+            background-image: url('assets/card-back.png');
+            background-size: cover;
+            border: 1px solid #3e4060;
+        }
 
         .board-divider { border: none; border-top: 1px solid #2e3050; margin: 2px 0; }
 
@@ -89,7 +89,6 @@
 
         @media (max-width: 360px) {
             .card { width: 46px; height: 70px; }
-            .card .c-mid { font-size: 16px; }
             .action { font-size: 0.7rem; padding: 8px 2px; }
         }
     </style>
@@ -163,9 +162,7 @@
 
 <script>
     var SUITS  = ['spade','cuori','quadri','fiori'];
-    var SYMS   = {spade:'&#9824;', cuori:'&#9829;', quadri:'&#9830;', fiori:'&#9827;'};
     var VALUES = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
-    var RED    = {cuori:true, quadri:true};
 
     var deck=[], playerHand=[], dealerHand=[];
     var credits=100, bet=10, hands=0, wins=0;
@@ -204,13 +201,10 @@
 
     function cardHTML(c, hidden){
         if(hidden) return '<div class="card hidden"></div>';
-        var cls = RED[c.s] ? 'red' : 'black';
-        var sym = SYMS[c.s];
-        return '<div class="card '+cls+'">'
-             + '<span class="c-top">'+c.v+'<br>'+sym+'</span>'
-             + '<span class="c-mid">'+sym+'</span>'
-             + '<span class="c-bot">'+c.v+'<br>'+sym+'</span>'
-             + '</div>';
+        var col = VALUES.indexOf(c.v);
+        var row = SUITS.indexOf(c.s);
+        var pos = (col/(VALUES.length-1)*100)+'% '+(row/(SUITS.length-1)*100)+'%';
+        return '<div class="card faceup" style="background-position:'+pos+'"></div>';
     }
 
     function render(hideDealer){
