@@ -25,58 +25,16 @@ function shuffleDeck(deck) {
     return deck;
 }
 
-// Disposizione dei pip per le carte numeriche 2-10, come nei mazzi veri: righe 1(alto)-5(basso),
-// colonne l/c/r. Le righe 4-5 vengono ruotate di 180° in cardEl (metà inferiore della carta).
-const PIP_LAYOUT = {
-    '2':  [[1,'c'],[5,'c']],
-    '3':  [[1,'c'],[3,'c'],[5,'c']],
-    '4':  [[1,'l'],[1,'r'],[5,'l'],[5,'r']],
-    '5':  [[1,'l'],[1,'r'],[3,'c'],[5,'l'],[5,'r']],
-    '6':  [[1,'l'],[1,'r'],[3,'l'],[3,'r'],[5,'l'],[5,'r']],
-    '7':  [[1,'l'],[1,'r'],[2,'c'],[3,'l'],[3,'r'],[5,'l'],[5,'r']],
-    '8':  [[1,'l'],[1,'r'],[2,'c'],[3,'l'],[3,'r'],[4,'c'],[5,'l'],[5,'r']],
-    '9':  [[1,'l'],[1,'r'],[2,'l'],[2,'r'],[3,'c'],[4,'l'],[4,'r'],[5,'l'],[5,'r']],
-    '10': [[1,'l'],[1,'r'],[2,'l'],[2,'c'],[2,'r'],[4,'l'],[4,'c'],[4,'r'],[5,'l'],[5,'r']],
-};
-const PIP_COL_INDEX = { l: 1, c: 2, r: 3 };
-
 // Crea l'elemento DOM di una carta. faceUp=false mostra il dorso (nessun valore leggibile).
+// Le facce usano lo sprite cards-sprite.png (13 colonne per valore, 4 righe per seme,
+// vedi cards-common.css) posizionato in percentuale per restare nitido a qualsiasi --card-w/h.
 function cardEl(card, faceUp) {
     const el = document.createElement('div');
     if (!faceUp) { el.className = 'card hidden'; return el; }
-    el.className = 'card ' + (isRedSuit(card.suit) ? 'red' : 'black') + (PIP_LAYOUT[card.value] ? '' : ' face');
-    const sym = SYMS[card.suit];
-    const top = document.createElement('span');
-    top.className = 'c-top';
-    top.innerHTML = card.value + '<br>' + sym;
-    const bot = document.createElement('span');
-    bot.className = 'c-bot';
-    bot.innerHTML = card.value + '<br>' + sym;
-    el.appendChild(top);
-
-    const layout = PIP_LAYOUT[card.value];
-    if (layout) {
-        // Numeri 2-10: disposizione realistica dei pip, come in un mazzo vero.
-        const grid = document.createElement('div');
-        grid.className = 'pip-grid';
-        for (const [row, col] of layout) {
-            const pip = document.createElement('span');
-            pip.className = 'pip' + (row >= 4 ? ' rot' : '');
-            pip.style.gridRow = row;
-            pip.style.gridColumn = PIP_COL_INDEX[col];
-            pip.textContent = sym;
-            grid.appendChild(pip);
-        }
-        el.appendChild(grid);
-    } else {
-        // A, J, Q, K restano stilizzati con un simbolo centrale grande.
-        const mid = document.createElement('span');
-        mid.className = 'c-mid';
-        mid.innerHTML = sym;
-        el.appendChild(mid);
-    }
-
-    el.appendChild(bot);
+    el.className = 'card faceup';
+    const col = VALUES.indexOf(card.value);
+    const row = SUITS.indexOf(card.suit);
+    el.style.backgroundPosition = (col / (VALUES.length - 1) * 100) + '% ' + (row / (SUITS.length - 1) * 100) + '%';
     return el;
 }
 

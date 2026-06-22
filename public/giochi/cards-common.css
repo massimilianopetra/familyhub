@@ -46,30 +46,21 @@ h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size:
 /* ── Carte ── */
 .card {
     width: var(--card-w); height: var(--card-h);
-    background: #f0ede6; border-radius: 6px; border: 1px solid #bbb;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 3px 4px; font-weight: 700;
+    background-color: #f0ede6; border-radius: 6px; border: 1px solid #bbb;
     position: relative; flex-shrink: 0;
     box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-    font-family: 'Courier New', Courier, monospace;
     cursor: pointer; user-select: none;
+    background-repeat: no-repeat;
 }
-.card.red   { color: #c0392b; }
-.card.black { color: #1a1b2e; }
-.card .c-top { align-self: flex-start; line-height: 1.05; font-size: calc(var(--card-w) * 0.16); }
-.card .c-mid { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 17px; line-height: 1; }
-.card .c-bot { align-self: flex-end; line-height: 1.05; font-size: calc(var(--card-w) * 0.16); transform: rotate(180deg); }
-.card.face .c-top, .card.face .c-bot { font-size: calc(var(--card-w) * 0.22); }
-.pip-grid {
-    position: absolute;
-    top: calc(var(--card-w) * 0.52); bottom: calc(var(--card-w) * 0.52);
-    left: calc(var(--card-w) * 0.20); right: calc(var(--card-w) * 0.20);
-    display: grid; grid-template-rows: repeat(5, 1fr); grid-template-columns: repeat(3, 1fr);
+.card.faceup {
+    background-image: url('assets/cards-sprite.png');
+    background-size: 1300% 400%;
 }
-.pip { display: flex; align-items: center; justify-content: center; font-size: calc(var(--card-w) * 0.13); line-height: 1; }
-.pip.rot { transform: rotate(180deg); }
-.card.hidden { background: #2a2c48; border: 1px solid #3e4060; cursor: pointer; }
-.card.hidden::after { content: ''; position: absolute; inset: 4px; border: 1px solid #4a4c68; border-radius: 4px; }
+.card.hidden {
+    background-image: url('assets/card-back.png');
+    background-size: cover;
+    border: 1px solid #3e4060;
+}
 .card.selected { box-shadow: 0 0 0 3px var(--accent), 0 2px 6px rgba(0,0,0,0.5); }
 .card.dest-hint { box-shadow: 0 0 0 3px #50fa7b, 0 2px 6px rgba(0,0,0,0.5); }
 .card.placeholder { background: rgba(255,255,255,0.04); border: 1px dashed #44475a; box-shadow: none; cursor: pointer; }
