@@ -86,6 +86,10 @@
         .pit.source      { border-color: #777 !important; opacity: 0.55; }
         .pit.ai-pick     { border-color: var(--p2) !important; background: #0e2e1a !important; animation: pulse 0.5s ease-in-out 3; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        @media (min-width: 700px) {
+            .game-container { max-width: 640px; }
+            .pit { width: 70px; height: 70px; max-height: 70px; }
+        }
 
         .pit-count { font-size: 0.8rem; font-weight: bold; color: var(--text); line-height: 1; }
         .pit-seeds { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
