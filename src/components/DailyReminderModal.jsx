@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { getEventType } from '../utils/eventTypes'
+import { daysRemaining, reorderDate, stockStatus } from '../utils/medicineUtils'
 
 function pad(n) { return String(n).padStart(2, '0') }
 function dateToStr(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` }
@@ -34,7 +35,7 @@ export default function DailyReminderModal({ session, forceTrigger }) {
       const todayS = dateToStr(today)
       const in7S   = dateToStr(in7)
 
-      const [{ data: payments }, { data: events }, { data: deadlines }] = await Promise.all([
+      const [{ data: payments }, { data: events }, { data: deadlines }, { data: meds }] = await Promise.all([
         supabase.from('payments').select('*').eq('user_id', userId).eq('is_paid', false),
         supabase.from('calendar_events').select('*').eq('user_id', userId)
           .lte('event_date', in7S)
@@ -42,6 +43,7 @@ export default function DailyReminderModal({ session, forceTrigger }) {
           .eq('is_deadline', false),
         supabase.from('calendar_events').select('*').eq('user_id', userId)
           .eq('is_deadline', true).eq('completed', false),
+        supabase.from('medicines').select('*').eq('is_active', true),
       ])
 
       const duePayments = (payments ?? [])
@@ -57,10 +59,17 @@ export default function DailyReminderModal({ session, forceTrigger }) {
       const pendingDeadlines = (deadlines ?? [])
         .sort((a, b) => a.event_date.localeCompare(b.event_date))
 
+      const lowStockMeds = (meds ?? [])
+        .filter(m => {
+          const s = stockStatus(m)
+          return s.level === 'critical' || s.level === 'low'
+        })
+        .sort((a, b) => daysRemaining(a) - daysRemaining(b))
+
       if (cancelled) return
       localStorage.setItem(storageKey, todayS)
-      if (duePayments.length > 0 || upcomingEvents.length > 0 || pendingDeadlines.length > 0 || isForced) {
-        setData({ payments: duePayments, events: upcomingEvents, deadlines: pendingDeadlines, todayS })
+      if (duePayments.length > 0 || upcomingEvents.length > 0 || pendingDeadlines.length > 0 || lowStockMeds.length > 0 || isForced) {
+        setData({ payments: duePayments, events: upcomingEvents, deadlines: pendingDeadlines, medicines: lowStockMeds, todayS })
       }
     }
 
@@ -76,7 +85,7 @@ export default function DailyReminderModal({ session, forceTrigger }) {
     setData(prev => prev && { ...prev, deadlines: prev.deadlines.filter(d => d.id !== id) })
   }
 
-  const isEmpty = data.payments.length === 0 && data.events.length === 0 && data.deadlines.length === 0
+  const isEmpty = data.payments.length === 0 && data.events.length === 0 && data.deadlines.length === 0 && data.medicines.length === 0
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000,
@@ -145,6 +154,34 @@ export default function DailyReminderModal({ session, forceTrigger }) {
                         fontSize: '0.7rem', fontWeight: '700', color: '#ef4444', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
                       ✓ Completa
                     </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {data.medicines.length > 0 && (
+          <div>
+            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase',
+              letterSpacing: '0.05em', marginBottom: '8px' }}>
+              💊 Scorte in esaurimento
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {data.medicines.map(m => {
+                const dr = daysRemaining(m)
+                const rDate = reorderDate(m)
+                const critical = dr != null && dr <= 3
+                return (
+                  <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px',
+                    background: '#0f172a', borderRadius: '8px', padding: '8px 12px',
+                    borderLeft: `3px solid ${critical ? '#ef4444' : '#f59e0b'}` }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#f1f5f9' }}>{m.medicine_name} · {m.person_name}</div>
+                      <div style={{ fontSize: '0.72rem', color: critical ? '#f87171' : '#fbbf24' }}>
+                        Autonomia {Math.floor(dr)} giorni{rDate ? ` · riordina entro il ${fmtDate(rDate)}` : ''}
+                      </div>
+                    </div>
                   </div>
                 )
               })}

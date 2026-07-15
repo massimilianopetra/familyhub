@@ -4,6 +4,7 @@ import GamesSection from './GamesSection'
 import CalendarSection from './CalendarSection'
 import UpcomingEventsSection from './UpcomingEventsSection'
 import LoyaltyCardsSection from './LoyaltyCardsSection'
+import MedicinesSection from './MedicinesSection'
 import AdminSection from './AdminSection'
 import PaymentsScreen from './PaymentsScreen'
 import DailyReminderModal from './DailyReminderModal'
@@ -15,6 +16,7 @@ const NAV_BASE = [
   { id: 'calendar', icon: '📅', label: 'Calendario' },
   { id: 'upcoming', icon: '🗓️', label: 'Prossimi' },
   { id: 'cards',    icon: '🎫', label: 'Tessere' },
+  { id: 'medicines', icon: '💊', label: 'Medicine' },
   { id: 'payments', icon: '💳', label: 'Pagamenti' },
 ]
 
@@ -137,6 +139,7 @@ export default function Dashboard({ session }) {
         {section === 'calendar' && <CalendarSection session={session} />}
         {section === 'upcoming' && <UpcomingEventsSection session={session} />}
         {section === 'cards'    && <LoyaltyCardsSection session={session} />}
+        {section === 'medicines' && <MedicinesSection session={session} />}
         {section === 'payments' && <PaymentsScreen user={session.user} />}
         {section === 'admin'    && isSuperUser && <AdminSection />}
       </main>
