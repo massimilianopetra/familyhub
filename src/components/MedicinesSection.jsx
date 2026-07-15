@@ -17,6 +17,57 @@ function fmtQty(n) {
   return String(Math.round(n * 10) / 10)
 }
 
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
+}
+
+// ── Export Word (.doc) dell'elenco terapie/scorte attualmente visualizzato ──
+function exportToWord(grouped) {
+  const sections = Object.keys(grouped).sort().map(person => {
+    const rows = grouped[person].map(m => {
+      const dr = daysRemaining(m)
+      const rDate = reorderDate(m)
+      return `
+        <tr>
+          <td>${escapeHtml(m.medicine_name)}</td>
+          <td>${escapeHtml(m.dosage_note || '-')}</td>
+          <td>${m.is_active ? 'In corso' : 'Sospesa'}</td>
+          <td>${fmtQty(currentStock(m))} ${escapeHtml(m.unit_label)}</td>
+          <td>${dr != null ? Math.floor(dr) + ' giorni' : '-'}</td>
+          <td>${rDate ? fmtDate(rDate) : '-'}</td>
+          <td>${escapeHtml(m.notes || '-')}</td>
+        </tr>`
+    }).join('')
+    return `
+      <h2 style="color:#1d4ed8; font-family:Calibri,Arial,sans-serif;">${escapeHtml(person)}</h2>
+      <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse; width:100%; margin-bottom:24px; font-family:Calibri,Arial,sans-serif; font-size:11pt;">
+        <thead>
+          <tr style="background:#e2e8f0;">
+            <th>Farmaco</th><th>Posologia</th><th>Stato</th><th>Scorte attuali</th><th>Autonomia</th><th>Riordina entro</th><th>Note</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`
+  }).join('')
+
+  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head><meta charset="utf-8"><title>Medicine e Terapie</title></head>
+    <body style="font-family:Calibri,Arial,sans-serif;">
+      <h1 style="color:#0f172a;">Medicine e Terapie</h1>
+      <p>Esportato il ${fmtDate(todayStr())}</p>
+      ${sections || '<p>Nessuna terapia da esportare.</p>'}
+    </body>
+  </html>`
+
+  const blob = new Blob(['﻿', html], { type: 'application/msword' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `Medicine_${todayStr()}.doc`
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 // ── Toggle ───────────────────────────────────────────────────────
 function Toggle({ checked, onChange, label }) {
   return (
@@ -380,6 +431,10 @@ export default function MedicinesSection({ session }) {
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
           <Toggle checked={onlyMine} onChange={v => { setOnlyMine(v); setPersonFilter('Tutti') }} label="Solo mie" />
           <Toggle checked={showInactive} onChange={setShowInactive} label="Mostra sospese" />
+          <button onClick={() => exportToWord(grouped)} title="Esporta l'elenco visualizzato in un file Word"
+            style={{ background: 'none', border: '1px solid #334155', borderRadius: '8px', color: '#94a3b8', padding: '9px 16px', fontSize: '0.88rem', fontWeight: '700', cursor: 'pointer' }}>
+            📄 Esporta Word
+          </button>
           <button onClick={() => setAddModal(true)}
             style={{ background: '#1d4ed8', border: 'none', borderRadius: '8px', color: '#fff', padding: '9px 16px', fontSize: '0.88rem', fontWeight: '700', cursor: 'pointer' }}>
             + Aggiungi
