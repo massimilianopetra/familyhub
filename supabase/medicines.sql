@@ -12,20 +12,20 @@ create table medicines (
   stock_units       numeric not null default 0,    -- scorte registrate in stock_as_of
   stock_as_of       date not null default current_date, -- data in cui sono state contate
   is_active         boolean not null default true, -- terapia in corso
-  visible_to_all    boolean not null default false, -- condivisa in sola lettura con la famiglia
   start_date        date default current_date,
   end_date          date,
   notes             text,
   created_at        timestamp with time zone default now()
 );
 
--- Row Level Security: ogni terapia è privata di chi la crea, a meno che non
--- venga condivisa (visible_to_all); solo chi l'ha creata può modificarla/eliminarla
+-- Row Level Security: tutti i membri della famiglia vedono le terapie di tutti
+-- (il filtro "Solo mie" è lato interfaccia), ma solo chi le ha create può
+-- modificarle/eliminarle (come tessere fedeltà ed eventi del calendario)
 alter table medicines enable row level security;
 
-create policy "Users can view own or shared medicines"
+create policy "Authenticated users can view medicines"
   on medicines for select
-  using (auth.uid() = user_id or visible_to_all = true);
+  using (auth.uid() is not null);
 
 create policy "Users can insert their own medicines"
   on medicines for insert
@@ -38,3 +38,7 @@ create policy "Users can update their own medicines"
 create policy "Users can delete their own medicines"
   on medicines for delete
   using (auth.uid() = user_id);
+
+-- Necessario perché la tabella è creata via SQL Editor: senza questo grant di
+-- base il ruolo "authenticated" riceve "permission denied" anche con le policy corrette.
+grant select, insert, update, delete on public.medicines to authenticated;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock } from '../utils/medicineUtils'
 
@@ -31,7 +31,7 @@ function Toggle({ checked, onChange, label }) {
 }
 
 // ── Modal aggiungi / modifica ────────────────────────────────────
-function MedicineModal({ medicine, personEmail, onClose, onSaved, onDeleted }) {
+function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDeleted }) {
   const isEdit = !!medicine
   const [medicineName,    setMedicineName]    = useState(medicine?.medicine_name    ?? '')
   const [dosageNote,      setDosageNote]      = useState(medicine?.dosage_note      ?? '')
@@ -42,13 +42,13 @@ function MedicineModal({ medicine, personEmail, onClose, onSaved, onDeleted }) {
   const initialStock = medicine ? Math.round(currentStock(medicine) * 10) / 10 : 0
   const [stockUnits,      setStockUnits]      = useState(initialStock)
   const [isActive,        setIsActive]        = useState(medicine?.is_active         ?? true)
-  const [visibleToAll,    setVisibleToAll]    = useState(medicine?.visible_to_all    ?? false)
   const [endDate,         setEndDate]         = useState(medicine?.end_date          ?? '')
   const [notes,           setNotes]           = useState(medicine?.notes             ?? '')
   const [saving,          setSaving]          = useState(false)
   const [deleting,        setDeleting]        = useState(false)
   const [confirmDel,      setConfirmDel]      = useState(false)
   const [error,           setError]           = useState('')
+  const mouseDownOnBackdrop = useRef(false)
 
   async function handleSave() {
     if (!medicineName.trim()) { setError('Il nome del farmaco è obbligatorio'); return }
@@ -71,7 +71,6 @@ function MedicineModal({ medicine, personEmail, onClose, onSaved, onDeleted }) {
       stock_units:        stockChanged ? Number(stockUnits) : (medicine?.stock_units ?? Number(stockUnits)),
       stock_as_of:        stockChanged ? todayStr() : (medicine?.stock_as_of ?? todayStr()),
       is_active:          isActive,
-      visible_to_all:     visibleToAll,
       end_date:           endDate || null,
       notes:              notes.trim() || null,
     }
@@ -80,7 +79,7 @@ function MedicineModal({ medicine, personEmail, onClose, onSaved, onDeleted }) {
     if (isEdit) {
       ;({ error: err } = await supabase.from('medicines').update(payload).eq('id', medicine.id))
     } else {
-      ;({ error: err } = await supabase.from('medicines').insert(payload))
+      ;({ error: err } = await supabase.from('medicines').insert({ ...payload, user_id: userId }))
     }
     setSaving(false)
     if (err) { setError('Errore: ' + err.message); return }
@@ -106,7 +105,8 @@ function MedicineModal({ medicine, personEmail, onClose, onSaved, onDeleted }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
+      onMouseDown={e => { mouseDownOnBackdrop.current = e.target === e.currentTarget }}
+      onClick={e => { if (mouseDownOnBackdrop.current && e.target === e.currentTarget) onClose() }}>
       <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '16px', padding: '24px 20px', width: '90%', maxWidth: '380px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 24px 60px rgba(0,0,0,0.85)', maxHeight: '90vh', overflowY: 'auto' }}>
 
         <div style={{ fontSize: '1.05rem', fontWeight: '700', color: '#f1f5f9' }}>
@@ -157,7 +157,6 @@ function MedicineModal({ medicine, personEmail, onClose, onSaved, onDeleted }) {
         </div>
 
         <Toggle checked={isActive} onChange={setIsActive} label="Terapia in corso" />
-        <Toggle checked={visibleToAll} onChange={setVisibleToAll} label="Visibile a tutta la famiglia (sola lettura)" />
 
         <div>
           <div style={lbl}>Fine terapia (facoltativo)</div>
@@ -288,8 +287,8 @@ function MedicineCard({ medicine, isOwner, onEdit, onRestocked }) {
           {status.label}
         </span>
         {!isOwner && (
-          <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#94a3b8', background: '#33415522', borderRadius: '20px', padding: '3px 10px' }}>
-            👁️ Condivisa · sola lettura
+          <span style={{ backgroundColor: '#334155', color: '#94a3b8', borderRadius: '20px', padding: '2px 8px', fontSize: '0.68rem', fontWeight: '600', whiteSpace: 'nowrap' }}>
+            👤 Famiglia
           </span>
         )}
       </div>
@@ -324,6 +323,7 @@ export default function MedicinesSection({ session }) {
   const [loading,     setLoading]     = useState(true)
   const [personFilter, setPersonFilter] = useState('Tutti')
   const [showInactive, setShowInactive] = useState(false)
+  const [onlyMine,    setOnlyMine]    = useState(true)
   const [addModal,    setAddModal]    = useState(false)
   const [editMedicine, setEditMedicine] = useState(null)
 
@@ -348,9 +348,11 @@ export default function MedicinesSection({ session }) {
     setMedicines(prev => prev.map(m => m.id === id ? { ...m, stock_units: newStock, stock_as_of: asOf } : m))
   }
 
-  const people = ['Tutti', ...Array.from(new Set(medicines.map(m => m.person_name))).sort()]
+  const visibleMedicines = onlyMine ? medicines.filter(m => m.user_id === currentUserId) : medicines
 
-  const filtered = medicines
+  const people = ['Tutti', ...Array.from(new Set(visibleMedicines.map(m => m.person_name))).sort()]
+
+  const filtered = visibleMedicines
     .filter(m => showInactive || m.is_active)
     .filter(m => personFilter === 'Tutti' || m.person_name === personFilter)
 
@@ -359,7 +361,7 @@ export default function MedicinesSection({ session }) {
     return acc
   }, {})
 
-  const lowStockCount = medicines.filter(m => {
+  const lowStockCount = visibleMedicines.filter(m => {
     const s = stockStatus(m)
     return s.level === 'critical' || s.level === 'low'
   }).length
@@ -371,11 +373,12 @@ export default function MedicinesSection({ session }) {
         <div>
           <h2 style={{ margin: '0 0 4px 0', fontSize: '1.5rem', color: '#38bdf8', fontWeight: 'bold' }}>💊 Medicine</h2>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem' }}>
-            {medicines.filter(m => m.is_active).length} terapie in corso
+            {visibleMedicines.filter(m => m.is_active).length} terapie in corso
             {lowStockCount > 0 && <span style={{ color: '#f59e0b' }}> · {lowStockCount} da riordinare</span>}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Toggle checked={onlyMine} onChange={v => { setOnlyMine(v); setPersonFilter('Tutti') }} label="Solo mie" />
           <Toggle checked={showInactive} onChange={setShowInactive} label="Mostra sospese" />
           <button onClick={() => setAddModal(true)}
             style={{ background: '#1d4ed8', border: 'none', borderRadius: '8px', color: '#fff', padding: '9px 16px', fontSize: '0.88rem', fontWeight: '700', cursor: 'pointer' }}>
@@ -432,6 +435,7 @@ export default function MedicinesSection({ session }) {
       {addModal && (
         <MedicineModal
           personEmail={session?.user?.email}
+          userId={currentUserId}
           onClose={() => setAddModal(false)}
           onSaved={fetchMedicines}
         />
