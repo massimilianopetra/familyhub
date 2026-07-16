@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock, nextDoseStatus } from '../utils/medicineUtils'
+import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock, displayStock, doseScheduleLabel, nextDoseStatus } from '../utils/medicineUtils'
 
 const UNIT_OPTIONS = ['compresse', 'ml', 'bustine', 'gocce', 'fiale', 'capsule', 'dosi', 'iniezioni']
 
@@ -10,11 +10,6 @@ function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.g
 function fmtDate(dateStr) {
   const d = new Date(dateStr + 'T00:00:00')
   return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-// Mostra un numero senza decimali inutili (1 invece di 1.0, ma 1.5 resta 1.5)
-function fmtQty(n) {
-  return String(Math.round(n * 10) / 10)
 }
 
 function escapeHtml(str) {
@@ -32,7 +27,7 @@ function exportToWord(grouped) {
           <td>${escapeHtml(m.medicine_name)}</td>
           <td>${escapeHtml(m.dosage_note || '-')}</td>
           <td>${m.is_active ? 'In corso' : 'Sospesa'}</td>
-          <td>${fmtQty(currentStock(m))} ${escapeHtml(m.unit_label)}</td>
+          <td>${displayStock(m)} ${escapeHtml(m.unit_label)}</td>
           <td>${dr != null ? Math.floor(dr) + ' giorni' : '-'}</td>
           <td>${rDate ? fmtDate(rDate) : '-'}</td>
           <td>${escapeHtml(m.notes || '-')}</td>
@@ -359,9 +354,9 @@ function MedicineCard({ medicine, isOwner, onEdit, onRestocked }) {
       </div>
 
       <div style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <span>Scorte: <strong style={{ color: '#f1f5f9' }}>{fmtQty(currentStock(medicine))} {medicine.unit_label}</strong></span>
+        <span>Scorte: <strong style={{ color: '#f1f5f9' }}>{displayStock(medicine)} {medicine.unit_label}</strong></span>
         {medicine.is_active && dc > 0 && (
-          <span>Consumo: {fmtQty(dc)} {medicine.unit_label}/giorno</span>
+          <span>Consumo: {doseScheduleLabel(medicine)}</span>
         )}
         {dr != null && (
           <span>

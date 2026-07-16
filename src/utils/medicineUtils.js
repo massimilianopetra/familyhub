@@ -30,6 +30,25 @@ export function currentStock(m) {
   return Math.max(0, recorded - dc * elapsed)
 }
 
+// Scorte da mostrare all'utente: arrotondate all'unità intera per eccesso,
+// così restano ferme al valore pieno per tutto l'intervallo e scalano di
+// un'unità esattamente il giorno in cui la dose viene presa (non ha senso
+// mostrare "0,9 iniezioni"). Il .toFixed(6) prima del ceil evita che errori
+// di virgola mobile (es. 1/15*15 = 1.0000000000000002) facciano scattare
+// il calo un giorno prima del dovuto.
+export function displayStock(m) {
+  return Math.ceil(Number(currentStock(m).toFixed(6)))
+}
+
+// Etichetta leggibile del ritmo di assunzione (es. "1 ogni 15 giorni"
+// invece della frazione "0,07 fiale/giorno")
+export function doseScheduleLabel(m) {
+  const interval = doseInterval(m)
+  const units = Number(m.units_per_intake || 0)
+  if (interval <= 1) return `${units} ${m.unit_label}/giorno`
+  return `${units} ${m.unit_label} ogni ${interval} giorni`
+}
+
 // Giorni residui di autonomia delle scorte, null se non calcolabile
 export function daysRemaining(m) {
   const dc = dailyConsumption(m)
