@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock } from '../utils/medicineUtils'
+import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock, nextDoseStatus } from '../utils/medicineUtils'
 
-const UNIT_OPTIONS = ['compresse', 'ml', 'bustine', 'gocce', 'fiale', 'capsule', 'dosi']
+const UNIT_OPTIONS = ['compresse', 'ml', 'bustine', 'gocce', 'fiale', 'capsule', 'dosi', 'iniezioni']
 
 function pad(n) { return String(n).padStart(2, '0') }
 function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
@@ -87,13 +87,14 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
   const [medicineName,    setMedicineName]    = useState(medicine?.medicine_name    ?? '')
   const [dosageNote,      setDosageNote]      = useState(medicine?.dosage_note      ?? '')
   const [unitLabel,       setUnitLabel]       = useState(medicine?.unit_label       ?? UNIT_OPTIONS[0])
-  const [timesPerDay,     setTimesPerDay]     = useState(medicine?.times_per_day     ?? 1)
   const [unitsPerIntake,  setUnitsPerIntake]  = useState(medicine?.units_per_intake  ?? 1)
   // Mostriamo le scorte calcolate ad oggi (già scalate del consumo), non il valore grezzo salvato
   const initialStock = medicine ? Math.round(currentStock(medicine) * 10) / 10 : 0
   const [stockUnits,      setStockUnits]      = useState(initialStock)
   const [isActive,        setIsActive]        = useState(medicine?.is_active         ?? true)
   const [endDate,         setEndDate]         = useState(medicine?.end_date          ?? '')
+  const [startDate,       setStartDate]       = useState(medicine?.start_date        ?? todayStr())
+  const [doseIntervalDays, setDoseIntervalDays] = useState(medicine?.dose_interval_days ?? 1)
   const [notes,           setNotes]           = useState(medicine?.notes             ?? '')
   const [saving,          setSaving]          = useState(false)
   const [deleting,        setDeleting]        = useState(false)
@@ -103,8 +104,11 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
 
   async function handleSave() {
     if (!medicineName.trim()) { setError('Il nome del farmaco è obbligatorio'); return }
-    if (Number(timesPerDay) < 0 || Number(unitsPerIntake) < 0 || Number(stockUnits) < 0) {
+    if (Number(unitsPerIntake) < 0 || Number(stockUnits) < 0) {
       setError('I valori numerici non possono essere negativi'); return
+    }
+    if (!(Number(doseIntervalDays) > 0)) {
+      setError('"Ogni quanti giorni" è obbligatorio ed è almeno 1'); return
     }
 
     setSaving(true)
@@ -117,12 +121,13 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
       medicine_name:     medicineName.trim(),
       dosage_note:       dosageNote.trim() || null,
       unit_label:         unitLabel,
-      times_per_day:      Number(timesPerDay),
       units_per_intake:   Number(unitsPerIntake),
       stock_units:        stockChanged ? Number(stockUnits) : (medicine?.stock_units ?? Number(stockUnits)),
       stock_as_of:        stockChanged ? todayStr() : (medicine?.stock_as_of ?? todayStr()),
       is_active:          isActive,
       end_date:           endDate || null,
+      start_date:         startDate || todayStr(),
+      dose_interval_days: Number(doseIntervalDays),
       notes:              notes.trim() || null,
     }
 
@@ -182,15 +187,18 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
 
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{ flex: 1 }}>
-            <div style={lbl}>Volte al giorno</div>
-            <input type="number" min="0" step="0.5" value={timesPerDay}
-              onChange={e => setTimesPerDay(e.target.value)} style={inp} />
-          </div>
-          <div style={{ flex: 1 }}>
             <div style={lbl}>Unità per assunzione</div>
             <input type="number" min="0" step="0.5" value={unitsPerIntake}
               onChange={e => setUnitsPerIntake(e.target.value)} style={inp} />
           </div>
+          <div style={{ flex: 1 }}>
+            <div style={lbl}>Ogni quanti giorni *</div>
+            <input type="number" min="1" step="1" value={doseIntervalDays}
+              onChange={e => setDoseIntervalDays(e.target.value)} style={inp} />
+          </div>
+        </div>
+        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '-6px' }}>
+          Determina sia il consumo scorte sia il promemoria dose. Es. una pastiglia al giorno → 1; un'iniezione ogni 15gg → 15.
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -212,6 +220,11 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
         <div>
           <div style={lbl}>Fine terapia (facoltativo)</div>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inp} />
+        </div>
+
+        <div>
+          <div style={lbl}>Prossima dose (o inizio terapia)</div>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inp} />
         </div>
 
         <div>
@@ -315,6 +328,7 @@ function MedicineCard({ medicine, isOwner, onEdit, onRestocked }) {
   const dc = dailyConsumption(medicine)
   const dr = daysRemaining(medicine)
   const rDate = reorderDate(medicine)
+  const nextDose = nextDoseStatus(medicine)
 
   return (
     <div style={{ background: '#1e293b', border: '1px solid #334155', borderLeft: `4px solid ${status.color}`, borderRadius: '12px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -347,13 +361,16 @@ function MedicineCard({ medicine, isOwner, onEdit, onRestocked }) {
       <div style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '2px' }}>
         <span>Scorte: <strong style={{ color: '#f1f5f9' }}>{fmtQty(currentStock(medicine))} {medicine.unit_label}</strong></span>
         {medicine.is_active && dc > 0 && (
-          <span>Consumo: {dc} {medicine.unit_label}/giorno</span>
+          <span>Consumo: {fmtQty(dc)} {medicine.unit_label}/giorno</span>
         )}
         {dr != null && (
           <span>
             Autonomia: <strong style={{ color: status.color }}>{Math.floor(dr)} giorni</strong>
             {rDate && <> · riordina entro il <strong style={{ color: status.color }}>{fmtDate(rDate)}</strong></>}
           </span>
+        )}
+        {nextDose && (
+          <span>💉 <strong style={{ color: nextDose.color }}>{nextDose.label}</strong> ({fmtDate(nextDose.date)})</span>
         )}
       </div>
 
