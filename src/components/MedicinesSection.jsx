@@ -64,12 +64,12 @@ function exportToWord(grouped) {
 }
 
 // ── Toggle ───────────────────────────────────────────────────────
-function Toggle({ checked, onChange, label }) {
+function Toggle({ checked, onChange, label, disabled = false }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: disabled ? 'not-allowed' : 'pointer', userSelect: 'none', opacity: disabled ? 0.55 : 1 }}>
       <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: '500' }}>{label}</span>
-      <div onClick={() => onChange(!checked)}
-        style={{ width: '44px', height: '24px', borderRadius: '12px', position: 'relative', transition: 'background-color .2s', cursor: 'pointer', flexShrink: 0, backgroundColor: checked ? '#4ade80' : '#334155' }}>
+      <div onClick={() => !disabled && onChange(!checked)}
+        style={{ width: '44px', height: '24px', borderRadius: '12px', position: 'relative', transition: 'background-color .2s', cursor: disabled ? 'not-allowed' : 'pointer', flexShrink: 0, backgroundColor: checked ? '#4ade80' : '#334155' }}>
         <div style={{ position: 'absolute', top: '2px', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#fff', transition: 'transform .2s', boxShadow: '0 1px 4px rgba(0,0,0,.4)', transform: checked ? 'translateX(20px)' : 'translateX(2px)' }} />
       </div>
     </label>
@@ -83,8 +83,10 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
   const [dosageNote,      setDosageNote]      = useState(medicine?.dosage_note      ?? '')
   const [unitLabel,       setUnitLabel]       = useState(medicine?.unit_label       ?? UNIT_OPTIONS[0])
   const [unitsPerIntake,  setUnitsPerIntake]  = useState(medicine?.units_per_intake  ?? 1)
-  // Mostriamo le scorte calcolate ad oggi (già scalate del consumo), non il valore grezzo salvato
-  const initialStock = medicine ? Math.round(currentStock(medicine) * 10) / 10 : 0
+  // In modifica il campo è bloccato: mostriamo le scorte arrotondate come sulla card
+  // (displayStock), non il valore decimale grezzo di currentStock, così il numero
+  // combacia con quello mostrato fuori dal modal invece di sembrare "calcolato diverso"
+  const initialStock = medicine ? displayStock(medicine) : 0
   const [stockUnits,      setStockUnits]      = useState(initialStock)
   const [isActive,        setIsActive]        = useState(medicine?.is_active         ?? true)
   const [endDate,         setEndDate]         = useState(medicine?.end_date          ?? '')
@@ -177,7 +179,8 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
         <div>
           <div style={lbl}>Posologia (facoltativo)</div>
           <input value={dosageNote} onChange={e => setDosageNote(e.target.value)}
-            placeholder="Es. 1 compressa dopo i pasti" style={inp} />
+            placeholder="Es. 1 compressa dopo i pasti" disabled={isEdit}
+            style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -194,34 +197,37 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
         </div>
         <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '-6px' }}>
           {isEdit
-            ? 'Per cambiare unità o intervallo elimina questa terapia e creane una nuova: determinano il consumo scorte già calcolato nel tempo.'
+            ? 'Per cambiare questi valori elimina questa terapia e creane una nuova: determinano il consumo scorte già calcolato nel tempo. Le scorte si aggiornano solo con ➕ Ricarica o 🔄 Correggi.'
             : "Determina sia il consumo scorte sia il promemoria dose. Es. una pastiglia al giorno → 1; un'iniezione ogni 15gg → 15."}
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{ flex: 1 }}>
             <div style={lbl}>Scorte attuali (contale oggi)</div>
-            <input type="number" min="0" step="0.5" value={stockUnits}
-              onChange={e => setStockUnits(e.target.value)} style={inp} />
+            <input type="number" min="0" step="0.5" value={stockUnits} disabled={isEdit}
+              onChange={e => setStockUnits(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={lbl}>Unità di misura</div>
-            <select value={unitLabel} onChange={e => setUnitLabel(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+            <select value={unitLabel} onChange={e => setUnitLabel(e.target.value)} disabled={isEdit}
+              style={{ ...inp, cursor: isEdit ? 'not-allowed' : 'pointer', opacity: isEdit ? 0.55 : 1 }}>
               {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
         </div>
 
-        <Toggle checked={isActive} onChange={setIsActive} label="Terapia in corso" />
+        <Toggle checked={isActive} onChange={setIsActive} label="Terapia in corso" disabled={isEdit} />
 
         <div>
           <div style={lbl}>Fine terapia (facoltativo)</div>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inp} />
+          <input type="date" value={endDate} disabled={isEdit}
+            onChange={e => setEndDate(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
         </div>
 
         <div>
           <div style={lbl}>Prossima dose (o inizio terapia)</div>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inp} />
+          <input type="date" value={startDate} disabled={isEdit}
+            onChange={e => setStartDate(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
         </div>
 
         <div>

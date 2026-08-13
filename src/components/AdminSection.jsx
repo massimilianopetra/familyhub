@@ -69,7 +69,7 @@ export default function AdminSection() {
     setBackupState('running')
     setBackupMsg('')
     try {
-      const tables = ['app_settings', 'calendar_events', 'loyalty_cards']
+      const tables = ['app_settings', 'calendar_events', 'loyalty_cards', 'medicines']
       const dump = { exported_at: new Date().toISOString(), tables: {} }
 
       for (const t of tables) {
