@@ -1,11 +1,11 @@
 function pad(n) { return String(n).padStart(2, '0') }
 function dateToStr(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
 
-function daysSince(dateStr) {
-  if (!dateStr) return 0
-  const then = new Date(dateStr + 'T00:00:00')
-  const now = new Date(); now.setHours(0, 0, 0, 0)
-  return Math.max(0, Math.round((now - then) / 86400000))
+// Differenza in giorni interi tra due date YYYY-MM-DD (b - a)
+function daysBetween(aStr, bStr) {
+  const a = new Date(aStr + 'T00:00:00')
+  const b = new Date(bStr + 'T00:00:00')
+  return Math.round((b - a) / 86400000)
 }
 
 // Ogni quanti giorni si ripete l'assunzione (campo obbligatorio; 1 se mancante
@@ -20,14 +20,36 @@ export function dailyConsumption(m) {
   return Number(m.units_per_intake || 0) / doseInterval(m)
 }
 
-// Scorte rimaste OGGI: quantità registrata in stock_as_of meno il consumo
-// previsto nei giorni trascorsi da allora (si aggiorna da sola col passare del tempo)
+// Quante dosi sono effettivamente cadute in calendario dopo `sinceStr` e fino
+// a oggi (incluso), secondo lo stesso ancoraggio usato da nextDoseDate:
+// start_date + multipli di dose_interval_days. Conta le date esatte di
+// assunzione, non una frazione di giorno per giorno.
+function dosesTakenSince(m, sinceStr) {
+  const interval = doseInterval(m)
+  const anchor = m.start_date || sinceStr
+  if (!anchor || !sinceStr) return 0
+  const today = dateToStr(new Date())
+
+  const anchorToToday = daysBetween(anchor, today)
+  if (anchorToToday < 0) return 0 // la terapia non è ancora iniziata
+
+  const kTo = Math.floor(anchorToToday / interval)
+  const anchorToSince = daysBetween(anchor, sinceStr)
+  const kFrom = anchorToSince < 0 ? 0 : Math.floor(anchorToSince / interval) + 1
+
+  return Math.max(0, kTo - kFrom + 1)
+}
+
+// Scorte rimaste OGGI: quantità registrata in stock_as_of meno le dosi
+// effettivamente cadute in calendario da allora ad oggi (si aggiorna da sola
+// col passare del tempo, ma scala di unità intere nelle date vere di
+// assunzione anziché sottrarre una frazione ogni giorno)
 export function currentStock(m) {
   const recorded = Number(m.stock_units || 0)
-  const dc = dailyConsumption(m)
-  if (!dc) return recorded
-  const elapsed = daysSince(m.stock_as_of)
-  return Math.max(0, recorded - dc * elapsed)
+  if (!m.is_active) return recorded
+  const doses = dosesTakenSince(m, m.stock_as_of)
+  const consumed = doses * Number(m.units_per_intake || 0)
+  return Math.max(0, recorded - consumed)
 }
 
 // Scorte da mostrare all'utente: arrotondate all'unità intera per eccesso,

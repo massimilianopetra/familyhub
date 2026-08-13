@@ -183,17 +183,19 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{ flex: 1 }}>
             <div style={lbl}>Unità per assunzione</div>
-            <input type="number" min="0" step="0.5" value={unitsPerIntake}
-              onChange={e => setUnitsPerIntake(e.target.value)} style={inp} />
+            <input type="number" min="0" step="0.5" value={unitsPerIntake} disabled={isEdit}
+              onChange={e => setUnitsPerIntake(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={lbl}>Ogni quanti giorni *</div>
-            <input type="number" min="1" step="1" value={doseIntervalDays}
-              onChange={e => setDoseIntervalDays(e.target.value)} style={inp} />
+            <input type="number" min="1" step="1" value={doseIntervalDays} disabled={isEdit}
+              onChange={e => setDoseIntervalDays(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
           </div>
         </div>
         <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '-6px' }}>
-          Determina sia il consumo scorte sia il promemoria dose. Es. una pastiglia al giorno → 1; un'iniezione ogni 15gg → 15.
+          {isEdit
+            ? 'Per cambiare unità o intervallo elimina questa terapia e creane una nuova: determinano il consumo scorte già calcolato nel tempo.'
+            : "Determina sia il consumo scorte sia il promemoria dose. Es. una pastiglia al giorno → 1; un'iniezione ogni 15gg → 15."}
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -317,8 +319,60 @@ function RestockControl({ medicine, onRestocked }) {
   )
 }
 
+// ── Correzione scorte (reset a un valore esatto in una data indicata) ────
+// Da usare quando il conteggio calcolato si è disallineato dalla realtà
+// (es. medicine perse/scadute/buttate): sovrascrive scorte e data di
+// riferimento invece di sommarle a quelle già calcolate.
+function ResetStockControl({ medicine, onReset }) {
+  const [open,   setOpen]   = useState(false)
+  const [amount, setAmount] = useState('')
+  const [asOfDate, setAsOfDate] = useState(todayStr())
+  const [saving, setSaving] = useState(false)
+
+  async function confirm() {
+    if (amount === '' || Number(amount) < 0) { setOpen(false); return }
+    const exact = Number(amount)
+    const asOf = asOfDate || todayStr()
+    setSaving(true)
+    const { error } = await supabase.from('medicines').update({ stock_units: exact, stock_as_of: asOf }).eq('id', medicine.id)
+    setSaving(false)
+    if (!error) onReset(medicine.id, exact, asOf)
+    setOpen(false)
+    setAmount('')
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => { setOpen(true); setAsOfDate(todayStr()) }}
+        style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: '#f59e0b', padding: '5px 10px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}>
+        🔄 Correggi
+      </button>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <input type="date" value={asOfDate} max={todayStr()}
+        onChange={e => setAsOfDate(e.target.value)}
+        style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', padding: '5px 8px', color: '#f1f5f9', fontSize: '0.75rem' }} />
+      <input autoFocus type="number" min="0" step="0.5" value={amount}
+        onChange={e => setAmount(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && confirm()}
+        placeholder="Qtà esatta"
+        style={{ width: '80px', background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', padding: '5px 8px', color: '#f1f5f9', fontSize: '0.8rem' }} />
+      <button onClick={confirm} disabled={saving}
+        style={{ background: '#92400e', border: 'none', borderRadius: '6px', color: '#fff', padding: '5px 10px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}>
+        ✓
+      </button>
+      <button onClick={() => { setOpen(false); setAmount('') }}
+        style={{ background: 'none', border: 'none', color: '#64748b', padding: '5px 6px', fontSize: '0.75rem', cursor: 'pointer' }}>
+        ✕
+      </button>
+    </div>
+  )
+}
+
 // ── Card singola terapia ─────────────────────────────────────────
-function MedicineCard({ medicine, isOwner, onEdit, onRestocked }) {
+function MedicineCard({ medicine, isOwner, onEdit, onRestocked, onReset }) {
   const status = stockStatus(medicine)
   const dc = dailyConsumption(medicine)
   const dr = daysRemaining(medicine)
@@ -370,8 +424,9 @@ function MedicineCard({ medicine, isOwner, onEdit, onRestocked }) {
       </div>
 
       {isOwner && (
-        <div style={{ marginTop: '4px' }}>
+        <div style={{ marginTop: '4px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <RestockControl medicine={medicine} onRestocked={onRestocked} />
+          <ResetStockControl medicine={medicine} onReset={onReset} />
         </div>
       )}
     </div>
@@ -493,6 +548,7 @@ export default function MedicinesSection({ session }) {
                 isOwner={m.user_id === currentUserId}
                 onEdit={setEditMedicine}
                 onRestocked={applyRestock}
+                onReset={applyRestock}
               />
             ))}
           </div>
