@@ -68,9 +68,9 @@ export default function DailyReminderModal({ session, forceTrigger }) {
 
       if (cancelled) return
       localStorage.setItem(storageKey, todayS)
-      if (duePayments.length > 0 || upcomingEvents.length > 0 || pendingDeadlines.length > 0 || lowStockMeds.length > 0 || isForced) {
-        setData({ payments: duePayments, events: upcomingEvents, deadlines: pendingDeadlines, medicines: lowStockMeds, todayS })
-      }
+      // Si mostra sempre almeno una volta al giorno, anche senza nulla da segnalare
+      // (in quel caso compare il ramo "Nessuna scadenza..." più sotto).
+      setData({ payments: duePayments, events: upcomingEvents, deadlines: pendingDeadlines, medicines: lowStockMeds, todayS })
     }
 
     load()
