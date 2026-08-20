@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock, displayStock, doseScheduleLabel, nextDoseStatus, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../utils/medicineUtils'
 
-const UNIT_OPTIONS = ['compresse', 'ml', 'bustine', 'gocce', 'fiale', 'capsule', 'dosi', 'iniezioni']
+const UNIT_OPTIONS = ['compresse', 'ml', 'bustine', 'gocce', 'fiale', 'capsule', 'dosi', 'iniezioni', 'cerotti', 'flaconi']
 
 function pad(n) { return String(n).padStart(2, '0') }
 function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
