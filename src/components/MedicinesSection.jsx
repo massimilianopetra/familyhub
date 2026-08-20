@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock, displayStock, doseScheduleLabel, nextDoseStatus } from '../utils/medicineUtils'
+import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock, displayStock, doseScheduleLabel, nextDoseStatus, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../utils/medicineUtils'
 
 const UNIT_OPTIONS = ['compresse', 'ml', 'bustine', 'gocce', 'fiale', 'capsule', 'dosi', 'iniezioni']
 
@@ -91,7 +91,9 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
   const [isActive,        setIsActive]        = useState(medicine?.is_active         ?? true)
   const [endDate,         setEndDate]         = useState(medicine?.end_date          ?? '')
   const [startDate,       setStartDate]       = useState(medicine?.start_date        ?? todayStr())
+  const [scheduleType,    setScheduleType]    = useState(medicine?.schedule_type      ?? 'interval')
   const [doseIntervalDays, setDoseIntervalDays] = useState(medicine?.dose_interval_days ?? 1)
+  const [weekdays,        setWeekdays]        = useState(medicine?.weekdays           ?? [])
   const [notes,           setNotes]           = useState(medicine?.notes             ?? '')
   const [saving,          setSaving]          = useState(false)
   const [deleting,        setDeleting]        = useState(false)
@@ -104,8 +106,11 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
     if (Number(unitsPerIntake) < 0 || Number(stockUnits) < 0) {
       setError('I valori numerici non possono essere negativi'); return
     }
-    if (!(Number(doseIntervalDays) > 0)) {
+    if (scheduleType === 'interval' && !(Number(doseIntervalDays) > 0)) {
       setError('"Ogni quanti giorni" è obbligatorio ed è almeno 1'); return
+    }
+    if (scheduleType === 'weekdays' && weekdays.length === 0) {
+      setError('Seleziona almeno un giorno della settimana'); return
     }
 
     setSaving(true)
@@ -124,7 +129,9 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
       is_active:          isActive,
       end_date:           endDate || null,
       start_date:         startDate || todayStr(),
-      dose_interval_days: Number(doseIntervalDays),
+      schedule_type:      scheduleType,
+      dose_interval_days: scheduleType === 'interval' ? Number(doseIntervalDays) : null,
+      weekdays:           scheduleType === 'weekdays' ? weekdays.slice().sort() : null,
       notes:              notes.trim() || null,
     }
 
@@ -183,22 +190,67 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
             style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <div style={{ flex: 1 }}>
-            <div style={lbl}>Unità per assunzione</div>
-            <input type="number" min="0" step="0.5" value={unitsPerIntake} disabled={isEdit}
-              onChange={e => setUnitsPerIntake(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
+        <div>
+          <div style={lbl}>Unità per assunzione</div>
+          <input type="number" min="0" step="0.5" value={unitsPerIntake} disabled={isEdit}
+            onChange={e => setUnitsPerIntake(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
+        </div>
+
+        <div>
+          <div style={lbl}>Tipo di posologia</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[
+              { value: 'interval', label: 'Ogni tot giorni' },
+              { value: 'weekdays', label: 'Giorni della settimana' },
+            ].map(opt => (
+              <button key={opt.value} type="button" disabled={isEdit}
+                onClick={() => !isEdit && setScheduleType(opt.value)}
+                style={{
+                  flex: 1, padding: '9px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700',
+                  cursor: isEdit ? 'not-allowed' : 'pointer', opacity: isEdit ? 0.55 : 1,
+                  background: scheduleType === opt.value ? '#1d4ed8' : '#0f172a',
+                  border: `1px solid ${scheduleType === opt.value ? '#1d4ed8' : '#334155'}`,
+                  color: scheduleType === opt.value ? '#fff' : '#94a3b8',
+                }}>
+                {opt.label}
+              </button>
+            ))}
           </div>
-          <div style={{ flex: 1 }}>
+        </div>
+
+        {scheduleType === 'interval' ? (
+          <div>
             <div style={lbl}>Ogni quanti giorni *</div>
             <input type="number" min="1" step="1" value={doseIntervalDays} disabled={isEdit}
               onChange={e => setDoseIntervalDays(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
           </div>
-        </div>
+        ) : (
+          <div>
+            <div style={lbl}>Giorni della settimana *</div>
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              {WEEKDAY_ORDER.map(d => {
+                const selected = weekdays.includes(d)
+                return (
+                  <button key={d} type="button" disabled={isEdit}
+                    onClick={() => !isEdit && setWeekdays(prev => selected ? prev.filter(x => x !== d) : [...prev, d])}
+                    style={{
+                      padding: '8px 6px', minWidth: '40px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '700',
+                      cursor: isEdit ? 'not-allowed' : 'pointer', opacity: isEdit ? 0.55 : 1,
+                      background: selected ? '#1d4ed8' : '#0f172a',
+                      border: `1px solid ${selected ? '#1d4ed8' : '#334155'}`,
+                      color: selected ? '#fff' : '#94a3b8',
+                    }}>
+                    {WEEKDAY_NAMES[d].slice(0, 3)}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
         <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '-6px' }}>
           {isEdit
             ? 'Per cambiare questi valori elimina questa terapia e creane una nuova: determinano il consumo scorte già calcolato nel tempo. Le scorte si aggiornano solo con ➕ Ricarica o 🔄 Correggi.'
-            : "Determina sia il consumo scorte sia il promemoria dose. Es. una pastiglia al giorno → 1; un'iniezione ogni 15gg → 15."}
+            : "Determina sia il consumo scorte sia il promemoria dose. Es. una pastiglia al giorno → ogni 1 giorno; un'iniezione ogni 15gg → ogni 15 giorni; una pastiglia solo giovedì e domenica → giorni della settimana."}
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
