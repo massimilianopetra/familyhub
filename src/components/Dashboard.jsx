@@ -9,6 +9,11 @@ import AdminSection from './AdminSection'
 import PaymentsScreen from './PaymentsScreen'
 import DailyReminderModal from './DailyReminderModal'
 import AboutSection from './AboutSection'
+import { saveCache } from '../utils/offlineCache'
+
+// Tabelle cacheate offline (vedi src/utils/offlineCache.js): non "payments",
+// che resta online-only essendo dati privati.
+const OFFLINE_TABLES = ['loyalty_cards', 'calendar_events', 'medicines']
 
 const SUPER_USER = 'massimiliano.petra@gmail.com'
 
@@ -56,6 +61,24 @@ export default function Dashboard({ session }) {
     setSection(id)
     setDrawerOpen(false)
   }
+
+  // Ad ogni avvio (con connettività) rinfresca in background la cache offline
+  // di tutte le sezioni cacheabili, non solo di quella mostrata di default —
+  // così anche aprendo direttamente "Tessere" o "Medicine" offline si trova
+  // l'ultimo dato scaricato, non quello dell'ultima volta che erano state
+  // visitate. Ogni sezione fa comunque il proprio fetch quando viene aperta:
+  // questo è solo un pre-riscaldamento silenzioso, nessun banner/loading qui.
+  useEffect(() => {
+    OFFLINE_TABLES.forEach(async table => {
+      try {
+        const { data, error } = await supabase.from(table).select('*')
+        if (error) throw error
+        saveCache(table, data ?? [])
+      } catch (err) {
+        console.warn(`[Dashboard] pre-riscaldamento cache "${table}" fallito:`, err)
+      }
+    })
+  }, [])
 
   return (
     <div style={{ ...s.shell, flexDirection: isMobile ? 'column' : 'row' }}>
