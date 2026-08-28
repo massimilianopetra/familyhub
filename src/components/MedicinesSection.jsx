@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock, displayStock, doseScheduleLabel, nextDoseStatus, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../utils/medicineUtils'
+import { saveCache, loadCache } from '../utils/offlineCache'
 
 const UNIT_OPTIONS = ['compresse', 'ml', 'bustine', 'gocce', 'fiale', 'capsule', 'dosi', 'iniezioni', 'cerotti', 'flaconi']
 
@@ -61,6 +62,15 @@ function exportToWord(grouped) {
   a.download = `Medicine_${todayStr()}.doc`
   document.body.appendChild(a); a.click(); document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+// ── Banner offline ──────────────────────────────────────────────
+function OfflineBanner() {
+  return (
+    <div style={{ background: '#422006', border: '1px solid #f59e0b', borderRadius: '8px', padding: '10px 14px', marginBottom: '18px', color: '#fbbf24', fontSize: '0.82rem' }}>
+      📴 Sei offline — mostro le ultime terapie salvate sul dispositivo, potrebbero non essere aggiornate.
+    </div>
+  )
 }
 
 // ── Toggle ───────────────────────────────────────────────────────
@@ -497,6 +507,7 @@ function MedicineCard({ medicine, isOwner, onEdit, onRestocked, onReset }) {
 export default function MedicinesSection({ session }) {
   const [medicines,   setMedicines]   = useState([])
   const [loading,     setLoading]     = useState(true)
+  const [offline,     setOffline]     = useState(false)
   const [personFilter, setPersonFilter] = useState('Tutti')
   const [showInactive, setShowInactive] = useState(false)
   const [onlyMine,    setOnlyMine]    = useState(true)
@@ -509,10 +520,18 @@ export default function MedicinesSection({ session }) {
 
   async function fetchMedicines() {
     setLoading(true)
-    const { data, error } = await supabase.from('medicines').select('*')
-      .order('person_name').order('medicine_name')
-    if (error) console.error('[Medicines] fetch error:', error)
-    setMedicines(data ?? [])
+    try {
+      const { data, error } = await supabase.from('medicines').select('*')
+        .order('person_name').order('medicine_name')
+      if (error) throw error
+      setMedicines(data ?? [])
+      setOffline(false)
+      saveCache('medicines', data ?? [])
+    } catch (err) {
+      console.error('[Medicines] fetch error:', err)
+      setMedicines(await loadCache('medicines'))
+      setOffline(true)
+    }
     setLoading(false)
   }
 
@@ -566,6 +585,8 @@ export default function MedicinesSection({ session }) {
           </button>
         </div>
       </div>
+
+      {offline && <OfflineBanner />}
 
       {people.length > 2 && (
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>

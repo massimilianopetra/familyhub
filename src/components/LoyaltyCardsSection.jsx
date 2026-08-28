@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import Barcode from 'react-barcode'
 import QRCodeLib from 'qrcode'
+import { saveCache, loadCache } from '../utils/offlineCache'
 
 const FORMATS = [
   { id: 'CODE128',  label: 'Code 128 (generico)' },
@@ -107,6 +108,15 @@ function Toggle({ checked, onChange, label }) {
         <div style={{ position:'absolute', top:'2px', width:'20px', height:'20px', borderRadius:'50%', backgroundColor:'#fff', transition:'transform .2s', boxShadow:'0 1px 4px rgba(0,0,0,.4)', transform: checked ? 'translateX(20px)' : 'translateX(2px)' }} />
       </div>
     </label>
+  )
+}
+
+// ── Banner offline ──────────────────────────────────────────────
+function OfflineBanner() {
+  return (
+    <div style={{ background:'#422006', border:'1px solid #f59e0b', borderRadius:'8px', padding:'10px 14px', marginBottom:'16px', color:'#fbbf24', fontSize:'0.82rem' }}>
+      📴 Sei offline — mostro le ultime tessere salvate sul dispositivo, potrebbero non essere aggiornate.
+    </div>
   )
 }
 
@@ -406,6 +416,7 @@ function LoyaltyCard({ card, isOwner, onEdit, onClick }) {
 export default function LoyaltyCardsSection({ session }) {
   const [cards,          setCards]          = useState([])
   const [loading,        setLoading]        = useState(true)
+  const [offline,        setOffline]        = useState(false)
   const [onlyMine,       setOnlyMine]       = useState(false)
   const [addModal,       setAddModal]       = useState(false)
   const [editCard,       setEditCard]       = useState(null)
@@ -417,9 +428,17 @@ export default function LoyaltyCardsSection({ session }) {
 
   async function fetchCards() {
     setLoading(true)
-    const { data, error } = await supabase.from('loyalty_cards').select('*').order('store_name')
-    if (error) console.error('[LoyaltyCards] fetch error:', error)
-    setCards(data ?? [])
+    try {
+      const { data, error } = await supabase.from('loyalty_cards').select('*').order('store_name')
+      if (error) throw error
+      setCards(data ?? [])
+      setOffline(false)
+      saveCache('loyalty_cards', data ?? [])
+    } catch (err) {
+      console.error('[LoyaltyCards] fetch error:', err)
+      setCards(await loadCache('loyalty_cards'))
+      setOffline(true)
+    }
     setLoading(false)
   }
 
@@ -447,6 +466,8 @@ export default function LoyaltyCardsSection({ session }) {
           </button>
         </div>
       </div>
+
+      {offline && <OfflineBanner />}
 
       {loading && (
         <div style={{ textAlign:'center', color:'#64748b', padding:'40px' }}>Caricamento…</div>

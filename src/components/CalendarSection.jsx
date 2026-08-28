@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { generateMonthShifts, generateRangeShifts } from '../utils/workShift'
 import { EVENT_TYPES, getEventType } from '../utils/eventTypes'
+import { saveCache, loadCache } from '../utils/offlineCache'
 
 const MONTHS_IT    = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
 const MONTHS_SHORT = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
@@ -185,6 +186,15 @@ function EventCard({ event, detailed, isOwner, onEdit, onToggleComplete }) {
       {detailed && event.description && (
         <span style={{ fontSize:'0.78rem', color:'#64748b', marginTop:'2px' }}>{event.description}</span>
       )}
+    </div>
+  )
+}
+
+// ── Banner offline ──────────────────────────────────────────────
+function OfflineBanner() {
+  return (
+    <div style={{ background:'#422006', border:'1px solid #f59e0b', borderRadius:'8px', padding:'10px 14px', marginBottom:'14px', color:'#fbbf24', fontSize:'0.82rem' }}>
+      📴 Sei offline — mostro gli ultimi eventi salvati sul dispositivo, potrebbero non essere aggiornati.
     </div>
   )
 }
@@ -688,6 +698,7 @@ export default function CalendarSection({ session }) {
   const [showShifts,   setShowShifts]   = useState(true)
   const [onlyMyEvents, setOnlyMyEvents] = useState(true)
   const [dbEvents,     setDbEvents]     = useState([])
+  const [offline,      setOffline]      = useState(false)
   const [addModal,     setAddModal]     = useState(null)
   const [editModal,    setEditModal]    = useState(null)
 
@@ -696,8 +707,17 @@ export default function CalendarSection({ session }) {
   useEffect(() => { fetchEvents() }, [])
 
   async function fetchEvents() {
-    const { data } = await supabase.from('calendar_events').select('*').order('event_date')
-    if (data) setDbEvents(data)
+    try {
+      const { data, error } = await supabase.from('calendar_events').select('*').order('event_date')
+      if (error) throw error
+      setDbEvents(data ?? [])
+      setOffline(false)
+      saveCache('calendar_events', data ?? [])
+    } catch (err) {
+      console.error('[Calendar] fetch error:', err)
+      setDbEvents(await loadCache('calendar_events'))
+      setOffline(true)
+    }
   }
 
   async function deleteEvent(id) {
@@ -768,6 +788,8 @@ export default function CalendarSection({ session }) {
           <Toggle checked={onlyMyEvents} onChange={setOnlyMyEvents} label="Solo miei" />
         </div>
       </div>
+
+      {offline && <OfflineBanner />}
 
       {showShifts && <Legend />}
 
