@@ -8,6 +8,7 @@ import MedicinesSection from './MedicinesSection'
 import AdminSection from './AdminSection'
 import PaymentsScreen from './PaymentsScreen'
 import DailyReminderModal from './DailyReminderModal'
+import AboutSection from './AboutSection'
 
 const SUPER_USER = 'massimiliano.petra@gmail.com'
 
@@ -18,6 +19,7 @@ const NAV_BASE = [
   { id: 'cards',    icon: '🎫', label: 'Tessere' },
   { id: 'medicines', icon: '💊', label: 'Medicine' },
   { id: 'payments', icon: '💳', label: 'Pagamenti' },
+  { id: 'about',    icon: 'ℹ️', label: 'Info' },
 ]
 
 function useIsMobile() {
@@ -141,6 +143,7 @@ export default function Dashboard({ session }) {
         {section === 'cards'    && <LoyaltyCardsSection session={session} />}
         {section === 'medicines' && <MedicinesSection session={session} />}
         {section === 'payments' && <PaymentsScreen user={session.user} />}
+        {section === 'about'    && <AboutSection />}
         {section === 'admin'    && isSuperUser && <AdminSection />}
       </main>
     </div>

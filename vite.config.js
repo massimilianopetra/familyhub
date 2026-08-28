@@ -1,9 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'node:child_process'
+
+// Versione mostrata nella sezione "Info" dell'app: presa dall'ultimo tag git
+// (es. "v2.0" in una build fatta esattamente su quel tag, "v2.0-3-gabc1234"
+// se ci sono commit successivi). Così la versione si aggiorna da sola ad
+// ogni build/deploy senza dover editare un numero a mano — basta taggare.
+function getAppVersion() {
+  try {
+    return execSync('git describe --tags --always --dirty').toString().trim()
+  } catch {
+    return 'dev'
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
+  define: {
+    __APP_VERSION__: JSON.stringify(getAppVersion()),
+  },
   plugins: [
     react(),
     VitePWA({
