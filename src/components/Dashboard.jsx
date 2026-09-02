@@ -13,7 +13,8 @@ import AboutSection from './AboutSection'
 import { saveCache } from '../utils/offlineCache'
 
 // Tabelle cacheate offline (vedi src/utils/offlineCache.js): non "payments",
-// che resta online-only essendo dati privati.
+// che resta online-only per scelta (dati finanziari, ora condivisi per
+// famiglia come le altre tre ma senza cache offline — mai rivisitato).
 const OFFLINE_TABLES = ['loyalty_cards', 'calendar_events', 'medicines']
 
 const SUPER_USER = 'massimiliano.petra@gmail.com'

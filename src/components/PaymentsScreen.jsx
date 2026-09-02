@@ -1,11 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-
-const CATEGORIES = [
-  'Tasse', 'Tassa Rifiuti', 'IMU', 'Bollo Auto', 'SMAT', 'Luce', 'Gas',
-  'Acqua', 'Internet', 'Mutuo/Affitto', 'Bolletta',
-  'Assicurazione', 'Altro',
-]
+import { PAYMENT_TYPES, getPaymentType, categoriesFor } from '../utils/paymentTypes'
 
 function calcNextDue(baseDate, interval) {
   const d = new Date(baseDate)
@@ -58,7 +53,7 @@ function Toggle({ checked, onChange, label }) {
 const todayStr = () => new Date().toISOString().slice(0, 10)
 
 const EMPTY_FORM = {
-  title: '', amount: '', category: 'Luce',
+  title: '', amount: '', category: 'Luce', type: 'spesa',
   due_date: '', is_paid: false,
   paid_at: todayStr(), notes: '',
   is_recurring: false, recurrence_interval: 'monthly',
@@ -74,6 +69,7 @@ export default function PaymentsScreen({ user }) {
   const [onlyMine,    setOnlyMine]    = useState(true)
   const [markingPaid, setMarkingPaid] = useState(null) // { id, date }
   const [editingId,   setEditingId]   = useState(null)
+  const [view,        setView]        = useState('lista') // 'lista' | 'rendiconto'
   const formRef = useRef(null)
 
   useEffect(() => { loadPayments() }, [])
@@ -93,6 +89,13 @@ export default function PaymentsScreen({ user }) {
 
   function setField(key, val) { setForm(f => ({ ...f, [key]: val })) }
 
+  function setType(type) {
+    setForm(f => {
+      const cats = categoriesFor(type)
+      return { ...f, type, category: cats.includes(f.category) ? f.category : cats[0] }
+    })
+  }
+
   function closeForm() {
     setShowForm(false)
     setEditingId(null)
@@ -105,6 +108,7 @@ export default function PaymentsScreen({ user }) {
       title:               p.title,
       amount:              String(p.amount),
       category:            p.category,
+      type:                p.type || 'spesa',
       due_date:            p.due_date || '',
       is_paid:             p.is_paid,
       paid_at:             p.paid_at || todayStr(),
@@ -131,6 +135,7 @@ export default function PaymentsScreen({ user }) {
       title:               form.title.trim(),
       amount:              Number(form.amount),
       category:            form.category,
+      type:                form.type,
       due_date:            form.due_date || null,
       is_paid:             form.is_paid,
       paid_at:             form.is_paid ? form.paid_at : null,
@@ -173,6 +178,7 @@ export default function PaymentsScreen({ user }) {
       title:               paymentData.title,
       amount:              paymentData.amount,
       category:            paymentData.category,
+      type:                paymentData.type,
       due_date:            nextDue,
       is_paid:             false,
       paid_at:             null,
@@ -212,11 +218,14 @@ export default function PaymentsScreen({ user }) {
   })
 
   const now        = new Date()
-  const monthPaid  = filtered.filter(p => {
+  const monthDone  = filtered.filter(p => {
     if (!p.is_paid || !p.paid_at) return false
     const d = new Date(p.paid_at)
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-  }).reduce((s, p) => s + Number(p.amount), 0)
+  })
+  const monthSpese   = monthDone.filter(p => p.type !== 'entrata').reduce((s, p) => s + Number(p.amount), 0)
+  const monthEntrate = monthDone.filter(p => p.type === 'entrata').reduce((s, p) => s + Number(p.amount), 0)
+  const monthSaldo   = monthEntrate - monthSpese
 
   const todayDate  = new Date(); todayDate.setHours(0,0,0,0)
   const in30       = new Date(todayDate); in30.setDate(in30.getDate() + 30)
@@ -245,17 +254,29 @@ export default function PaymentsScreen({ user }) {
         <div>
           <h2 style={{ color: '#f1f5f9', margin: 0, fontSize: 22, fontWeight: 700 }}>💳 Pagamenti</h2>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>
-            {filtered.length} {filtered.length === 1 ? 'pagamento' : 'pagamenti'}
+            {filtered.length} {filtered.length === 1 ? 'movimento' : 'movimenti'}
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Toggle checked={onlyMine} onChange={setOnlyMine} label="Solo miei" />
-          <button
-            onClick={() => showForm ? closeForm() : setShowForm(true)}
-            style={{ backgroundColor: '#3ecf8e', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}
-          >
-            {showForm ? 'Annulla' : '+ Nuovo'}
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {view === 'lista' && <Toggle checked={onlyMine} onChange={setOnlyMine} label="Solo miei" />}
+          <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #ccc' }}>
+            <button onClick={() => setView('lista')}
+              style={{ ...viewTabBtn, backgroundColor: view === 'lista' ? '#1c1c1c' : 'transparent', color: view === 'lista' ? '#fff' : '#444' }}>
+              Lista
+            </button>
+            <button onClick={() => setView('rendiconto')}
+              style={{ ...viewTabBtn, backgroundColor: view === 'rendiconto' ? '#1c1c1c' : 'transparent', color: view === 'rendiconto' ? '#fff' : '#444' }}>
+              Rendiconto
+            </button>
+          </div>
+          {view === 'lista' && (
+            <button
+              onClick={() => showForm ? closeForm() : setShowForm(true)}
+              style={{ backgroundColor: '#3ecf8e', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}
+            >
+              {showForm ? 'Annulla' : '+ Nuovo'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -266,13 +287,32 @@ export default function PaymentsScreen({ user }) {
         </div>
       )}
 
+      {view === 'rendiconto' ? (
+        <MonthlyReport payments={payments} />
+      ) : (
+      <>
       {/* Monthly summary */}
-      <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '16px 20px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '16px 20px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
-            Pagato {now.toLocaleString('it-IT', { month: 'long', year: 'numeric' })}
+            {now.toLocaleString('it-IT', { month: 'long', year: 'numeric' })}
           </div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: '#111' }}>€ {monthPaid.toFixed(2)}</div>
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 11, color: '#999' }}>Spese</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#ef4444' }}>€ {monthSpese.toFixed(2)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: '#999' }}>Entrate</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#4ade80' }}>€ {monthEntrate.toFixed(2)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: '#999' }}>Saldo</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: monthSaldo >= 0 ? '#111' : '#ef4444' }}>
+                {monthSaldo >= 0 ? '+' : ''}€ {monthSaldo.toFixed(2)}
+              </div>
+            </div>
+          </div>
         </div>
         <span style={{ fontSize: 36 }}>📊</span>
       </div>
@@ -318,7 +358,19 @@ export default function PaymentsScreen({ user }) {
       {showForm && (
         <div ref={formRef} style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '20px', marginBottom: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: '#111', marginBottom: 18 }}>
-            {editingId ? '✏️ Modifica pagamento' : 'Nuovo pagamento'}
+            {editingId ? '✏️ Modifica movimento' : 'Nuovo movimento'}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+            {PAYMENT_TYPES.map(t => (
+              <button key={t.id} type="button" onClick={() => setType(t.id)}
+                style={{ flex: 1, padding: '9px 0', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                  border: `1px solid ${form.type === t.id ? t.color : '#ccc'}`,
+                  backgroundColor: form.type === t.id ? t.color : 'transparent',
+                  color: form.type === t.id ? '#fff' : '#444' }}>
+                {t.emoji} {t.label}
+              </button>
+            ))}
           </div>
 
           <div style={fld}>
@@ -336,7 +388,7 @@ export default function PaymentsScreen({ user }) {
             <div style={{ flex: 1 }}>
               <label style={lbl}>Categoria</label>
               <select value={form.category} onChange={e => setField('category', e.target.value)} style={inp}>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {categoriesFor(form.type).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
@@ -353,13 +405,13 @@ export default function PaymentsScreen({ user }) {
               onChange={e => setField('is_paid', e.target.checked)}
               style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#3ecf8e' }} />
             <label htmlFor="chk-paid" style={{ ...lbl, margin: 0, cursor: 'pointer' }}>
-              Ho già pagato
+              {form.type === 'entrata' ? 'Ho già incassato' : 'Ho già pagato'}
             </label>
           </div>
 
           {form.is_paid && (
             <div style={fld}>
-              <label style={lbl}>Data pagamento</label>
+              <label style={lbl}>{getPaymentType(form.type).dateLabel}</label>
               <input type="date" value={form.paid_at}
                 onChange={e => setField('paid_at', e.target.value)} style={inp} />
             </div>
@@ -376,7 +428,7 @@ export default function PaymentsScreen({ user }) {
             <input type="checkbox" id="chk-rec" checked={form.is_recurring}
               onChange={e => setField('is_recurring', e.target.checked)}
               style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#3ecf8e' }} />
-            <label htmlFor="chk-rec" style={{ ...lbl, margin: 0, cursor: 'pointer' }}>Pagamento ricorrente</label>
+            <label htmlFor="chk-rec" style={{ ...lbl, margin: 0, cursor: 'pointer' }}>Movimento ricorrente</label>
           </div>
 
           {form.is_recurring && (
@@ -402,7 +454,7 @@ export default function PaymentsScreen({ user }) {
               style={{ flex: 1, backgroundColor: saving ? '#555' : '#1c1c1c', color: '#fff', border: 'none',
                 borderRadius: 8, padding: '11px 0', fontWeight: 600, fontSize: 14,
                 cursor: saving ? 'not-allowed' : 'pointer' }}>
-              {saving ? 'Salvataggio...' : editingId ? 'Aggiorna pagamento' : 'Salva pagamento'}
+              {saving ? 'Salvataggio...' : editingId ? 'Aggiorna movimento' : 'Salva movimento'}
             </button>
           </div>
         </div>
@@ -413,15 +465,16 @@ export default function PaymentsScreen({ user }) {
         <div style={{ color: '#94a3b8', textAlign: 'center', padding: 40, fontSize: 14 }}>Caricamento...</div>
       ) : sorted.length === 0 ? (
         <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: 32, textAlign: 'center', color: '#888', fontSize: 14 }}>
-          {onlyMine ? <>Nessun pagamento.<br />Clicca &quot;+ Nuovo&quot; per iniziare.</> : 'Nessun pagamento trovato.'}
+          {onlyMine ? <>Nessun movimento.<br />Clicca &quot;+ Nuovo&quot; per iniziare.</> : 'Nessun movimento trovato.'}
         </div>
       ) : (
         <>
-          <div style={sLabel}>Tutti i pagamenti</div>
+          <div style={sLabel}>Tutti i movimenti</div>
           {sorted.map(p => {
             const isOwn    = p.user_id === user.id
             const isPaying = markingPaid?.id === p.id
             const overdue  = !p.is_paid && p.due_date && new Date(p.due_date) < todayDate
+            const pt       = getPaymentType(p.type)
 
             return (
               <div key={p.id} style={{
@@ -437,14 +490,14 @@ export default function PaymentsScreen({ user }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 600, color: '#111', fontSize: 15 }}>{p.title}</span>
 
-                      {/* Paid / unpaid badge */}
+                      {/* Done / pending badge */}
                       {p.is_paid ? (
                         <span style={{ fontSize: 11, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: 4, padding: '2px 7px', whiteSpace: 'nowrap' }}>
-                          ✓ Pagato
+                          ✓ {pt.doneLabel}
                         </span>
                       ) : (
                         <span style={{ fontSize: 11, backgroundColor: overdue ? '#fef2f2' : '#fffbeb', border: `1px solid ${overdue ? '#fecaca' : '#fde68a'}`, color: overdue ? '#991b1b' : '#92400e', borderRadius: 4, padding: '2px 7px', whiteSpace: 'nowrap' }}>
-                          {overdue ? '⚠️ Scaduto' : '⏳ Da pagare'}
+                          {overdue ? '⚠️ Scaduto' : `⏳ ${pt.pendingLabel}`}
                         </span>
                       )}
 
@@ -464,15 +517,15 @@ export default function PaymentsScreen({ user }) {
                     <div style={{ fontSize: 13, color: '#666' }}>
                       {p.category}
                       {p.due_date  && <span> · Scadenza: {new Date(p.due_date).toLocaleDateString('it-IT')}</span>}
-                      {p.is_paid && p.paid_at && <span> · Pagato: {new Date(p.paid_at).toLocaleDateString('it-IT')}</span>}
+                      {p.is_paid && p.paid_at && <span> · {pt.doneLabel}: {new Date(p.paid_at).toLocaleDateString('it-IT')}</span>}
                       {p.notes && <span style={{ color: '#999' }}> — {p.notes}</span>}
                     </div>
                   </div>
 
                   {/* Right side: amount + actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15, color: '#111', whiteSpace: 'nowrap' }}>
-                      € {Number(p.amount).toFixed(2)}
+                    <span style={{ fontWeight: 700, fontSize: 15, color: pt.color, whiteSpace: 'nowrap' }}>
+                      {pt.emoji} € {Number(p.amount).toFixed(2)}
                     </span>
                     {p.is_recurring && (p.next_due_date || p.due_date) && (
                       <button onClick={() => downloadIcs(p)} title="Aggiungi al calendario"
@@ -485,7 +538,7 @@ export default function PaymentsScreen({ user }) {
                         onClick={() => setMarkingPaid(isPaying ? null : { id: p.id, date: todayStr() })}
                         style={{ backgroundColor: '#3ecf8e', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
                       >
-                        ✓ Paga
+                        ✓ {pt.verb}
                       </button>
                     )}
                     {isOwn && (
@@ -503,10 +556,10 @@ export default function PaymentsScreen({ user }) {
                   </div>
                 </div>
 
-                {/* Inline "mark as paid" panel */}
+                {/* Inline "mark as done" panel */}
                 {isPaying && (
                   <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #eaeaea', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, color: '#444', fontWeight: 500 }}>Data pagamento:</span>
+                    <span style={{ fontSize: 13, color: '#444', fontWeight: 500 }}>{pt.dateLabel}:</span>
                     <input type="date" value={markingPaid.date}
                       onChange={e => setMarkingPaid(m => ({ ...m, date: e.target.value }))}
                       style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ccc', fontSize: 13, outline: 'none', backgroundColor: '#f9f9f9' }} />
@@ -527,11 +580,120 @@ export default function PaymentsScreen({ user }) {
           })}
         </>
       )}
+      </>
+      )}
+    </div>
+  )
+}
+
+// ── Rendiconto mensile ───────────────────────────────────────────────────────
+// Per-mese, per-membro: spese/entrate/saldo. Nessuna nuova fetch di righe —
+// riusa `payments` già caricato dal componente padre; carica solo l'elenco
+// membri (email) via list_family_members(), stesso RPC di FamilySection.jsx.
+function MonthlyReport({ payments }) {
+  const [members, setMembers] = useState(null) // { [user_id]: email } oppure null finché non caricato
+  const [membersError, setMembersError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.rpc('list_family_members').then(({ data, error }) => {
+      if (cancelled) return
+      if (error) { setMembersError(error.message); return }
+      const map = {}
+      for (const m of data || []) map[m.user_id] = m.email
+      setMembers(map)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  function memberLabel(userId) {
+    const email = members?.[userId]
+    return email ? email.split('@')[0] : userId.slice(0, 8)
+  }
+
+  // { 'YYYY-MM': { [user_id]: { spesa, entrata } } }, solo movimenti confermati
+  const byMonth = {}
+  for (const p of payments) {
+    if (!p.is_paid || !p.paid_at) continue
+    const d   = new Date(p.paid_at)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    byMonth[key] ??= {}
+    byMonth[key][p.user_id] ??= { spesa: 0, entrata: 0 }
+    byMonth[key][p.user_id][p.type === 'entrata' ? 'entrata' : 'spesa'] += Number(p.amount)
+  }
+  const months = Object.keys(byMonth).sort().reverse()
+
+  if (members === null && !membersError) {
+    return <div style={{ color: '#94a3b8', textAlign: 'center', padding: 40, fontSize: 14 }}>Caricamento...</div>
+  }
+
+  return (
+    <div>
+      {membersError && (
+        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>
+          {membersError}
+        </div>
+      )}
+      {months.length === 0 ? (
+        <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: 32, textAlign: 'center', color: '#888', fontSize: 14 }}>
+          Nessun movimento confermato ancora — il rendiconto conta solo ciò che è stato segnato come {getPaymentType('spesa').doneLabel.toLowerCase()}/{getPaymentType('entrata').doneLabel.toLowerCase()}.
+        </div>
+      ) : months.map(month => {
+        const rows = byMonth[month]
+        const userIds = Object.keys(rows).sort((a, b) => memberLabel(a).localeCompare(memberLabel(b)))
+        const totSpesa   = userIds.reduce((s, u) => s + rows[u].spesa, 0)
+        const totEntrata = userIds.reduce((s, u) => s + rows[u].entrata, 0)
+        const label = new Date(`${month}-01T00:00:00`).toLocaleString('it-IT', { month: 'long', year: 'numeric' })
+
+        return (
+          <div key={month} style={{ marginBottom: 24 }}>
+            <div style={sLabel}>{label}</div>
+            <div style={{ overflowX: 'auto', backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 420 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #eaeaea' }}>
+                    <th style={thStyle}>Membro</th>
+                    <th style={{ ...thStyle, textAlign: 'right', color: '#ef4444' }}>Spese</th>
+                    <th style={{ ...thStyle, textAlign: 'right', color: '#4ade80' }}>Entrate</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {userIds.map(u => {
+                    const saldo = rows[u].entrata - rows[u].spesa
+                    return (
+                      <tr key={u} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={tdStyle}>{memberLabel(u)}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>€ {rows[u].spesa.toFixed(2)}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>€ {rows[u].entrata.toFixed(2)}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: saldo >= 0 ? '#111' : '#ef4444' }}>
+                          {saldo >= 0 ? '+' : ''}€ {saldo.toFixed(2)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  <tr>
+                    <td style={{ ...tdStyle, fontWeight: 700 }}>Totale famiglia</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>€ {totSpesa.toFixed(2)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>€ {totEntrata.toFixed(2)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: (totEntrata - totSpesa) >= 0 ? '#111' : '#ef4444' }}>
+                      {(totEntrata - totSpesa) >= 0 ? '+' : ''}€ {(totEntrata - totSpesa).toFixed(2)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
 const sLabel = { color: '#94a3b8', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }
 const fld    = { marginBottom: 14 }
+const viewTabBtn = { padding: '9px 14px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }
+const thStyle = { textAlign: 'left', padding: '10px 12px', color: '#666', fontWeight: 600, fontSize: 12 }
+const tdStyle = { padding: '9px 12px', color: '#111' }
 const lbl    = { display: 'block', fontSize: 13, fontWeight: 500, color: '#444', marginBottom: 5 }
 const inp    = { width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #ccc', fontSize: 14, outline: 'none', backgroundColor: '#f9f9f9', color: '#111', colorScheme: 'light', boxSizing: 'border-box', fontFamily: 'system-ui, -apple-system, sans-serif' }
