@@ -15,6 +15,9 @@
             --slot-active-glow: rgba(241, 196, 15, 0.4);
         }
 
+        /* height (non min-height) + overflow:hidden: qui vh è l'altezza reale
+           dell'iframe — il contenuto deve sempre starci dentro, mai mostrare
+           uno scroll interno. */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg-color);
@@ -24,8 +27,9 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 100vh;
+            height: 100vh;
             box-sizing: border-box;
+            overflow: hidden;
         }
 
         h1 {
@@ -43,6 +47,9 @@
             text-align: center;
         }
 
+        /* flex column + min-height:0: la card si allunga a riempire tutta
+           l'altezza disponibile, così .board-wrap sotto (flex:1) può usare
+           esattamente lo spazio che resta dopo le fasce sopra. */
         .game-container {
             background-color: var(--panel-color);
             padding: 25px;
@@ -51,6 +58,10 @@
             width: 100%;
             max-width: 440px;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            flex: 1;
         }
         @media (min-width: 700px) { .game-container { max-width: 640px; } }
 
@@ -71,16 +82,26 @@
             color: #50fa7b;
         }
 
-        /* Griglia di Gioco 5x5 */
+        /* container-type:size abilita cqh sotto (100cqh = altezza reale
+           rimasta qui dentro); flex:1 assorbe lo spazio verticale avanzato. */
+        .board-wrap {
+            flex: 1; min-height: 0; margin-bottom: 25px;
+            display: flex; align-items: center; justify-content: center;
+            container-type: size;
+        }
+        /* Griglia di Gioco 5x5, quadrata, grande quanto lo spazio disponibile
+           lo consente sia in larghezza (100%) sia in altezza (100cqh). */
         .board-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
             gap: 12px;
-            margin-bottom: 25px;
             background: #21222c;
             padding: 15px;
             border-radius: 8px;
             border: 1px solid #111217;
+            width: min(100%, 100cqh);
+            aspect-ratio: 1;
+            box-sizing: border-box;
         }
 
         .light-cell {
@@ -184,7 +205,9 @@
         </div>
 
         <!-- Griglia Luci Principale -->
-        <div class="board-grid" id="light-board"></div>
+        <div class="board-wrap">
+            <div class="board-grid" id="light-board"></div>
+        </div>
 
         <!-- Controlli Giocatore -->
         <div class="controls">
