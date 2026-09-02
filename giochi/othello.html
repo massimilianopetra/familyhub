@@ -11,17 +11,19 @@
             --p1: #3498db; --p2: #2ecc71; --accent: #f1c40f;
         }
         * { box-sizing: border-box; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        /* height (non min-height) + overflow:hidden: qui vh è l'altezza reale
+           dell'iframe (non della finestra del browser) — vogliamo che il
+           contenuto stia sempre esattamente dentro quello spazio, mai oltre,
+           senza mai mostrare uno scroll interno. */
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; box-sizing: border-box; }
         h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size: 1rem; }
         .subtitle { margin-bottom: 6px; color: #a0a2b1; font-size: 0.7rem; }
-        .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 380px; }
-        /* Su desktop la scacchiera scala con la larghezza dello schermo, ma va
-           limitata anche dall'altezza disponibile (qui vh = altezza reale
-           dell'iframe, non della finestra): senza questo limite, su schermi
-           bassi la scacchiera 8x8 + le fasce sopra (titolo, modalità,
-           punteggio, messaggi: ~280px) superano lo spazio a disposizione e il
-           gioco finisce col proprio scroll interno invece di stare tutto a vista. */
-        @media (min-width: 700px) { .game-container { max-width: min(640px, calc(100vh - 300px)); } }
+        /* flex column + min-height:0: la card si allunga fino a riempire tutta
+           l'altezza disponibile (non solo quella del suo contenuto), così
+           .board-wrap sotto (flex:1) può usare esattamente lo spazio che resta
+           dopo titolo/modalità/punteggio/messaggi, invece di uscire dal bordo. */
+        .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 380px; display: flex; flex-direction: column; min-height: 0; flex: 1; }
+        @media (min-width: 700px) { .game-container { max-width: 640px; } }
 
         .top-controls { display: flex; gap: 5px; margin-bottom: 6px; }
         .btn-mode { flex: 1; padding: 6px 4px; border: 2px solid var(--hidden); border-radius: 6px; background: var(--empty); color: #a0a2b1; font-weight: bold; font-size: 0.7rem; cursor: pointer; transition: all 0.15s; }
@@ -38,8 +40,15 @@
         .message-bar { background: var(--empty); border-radius: 5px; padding: 4px 8px; font-size: 0.7rem; color: #a0a2b1; text-align: center; margin-bottom: 5px; min-height: 24px; display: flex; align-items: center; justify-content: center; }
         .message-bar.highlight { color: var(--accent); font-weight: bold; }
 
-        .board-wrap { background: #163825; border-radius: 8px; padding: 6px; margin-bottom: 6px; }
-        .board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+        /* container-type:size abilita le unità cqh sotto: 100cqh = 100%
+           dell'altezza REALE rimasta qui dentro (dopo le fasce fisse sopra),
+           non dell'iframe intero. flex:1 + min-height:0 fa sì che questo
+           riquadro assorba tutto lo spazio verticale avanzato. */
+        .board-wrap { background: #163825; border-radius: 8px; padding: 6px; margin-bottom: 6px; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; container-type: size; }
+        /* La scacchiera è sempre quadrata (aspect-ratio:1) e grande quanto lo
+           spazio disponibile lo consente, sia in larghezza (100%) sia in
+           altezza (100cqh) — qualunque sia il fattore limitante, mai tagliata. */
+        .board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; width: min(100%, 100cqh); aspect-ratio: 1; }
         .cell { aspect-ratio: 1; border-radius: 4px; background: #1e5035; display: flex; align-items: center; justify-content: center; cursor: default; position: relative; transition: background 0.1s; }
         .cell.valid { background: #256040; cursor: pointer; }
         .cell.valid:hover { background: #2e7a52; }
