@@ -212,6 +212,7 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
             {[
               { value: 'interval', label: 'Ogni tot giorni' },
               { value: 'weekdays', label: 'Giorni della settimana' },
+              { value: 'occasional', label: 'Al bisogno' },
             ].map(opt => (
               <button key={opt.value} type="button" disabled={isEdit}
                 onClick={() => !isEdit && setScheduleType(opt.value)}
@@ -228,13 +229,14 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
           </div>
         </div>
 
-        {scheduleType === 'interval' ? (
+        {scheduleType === 'interval' && (
           <div>
             <div style={lbl}>Ogni quanti giorni *</div>
             <input type="number" min="1" step="1" value={doseIntervalDays} disabled={isEdit}
               onChange={e => setDoseIntervalDays(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
           </div>
-        ) : (
+        )}
+        {scheduleType === 'weekdays' && (
           <div>
             <div style={lbl}>Giorni della settimana *</div>
             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -259,8 +261,10 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
         )}
         <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '-6px' }}>
           {isEdit
-            ? 'Per cambiare questi valori elimina questa terapia e creane una nuova: determinano il consumo scorte già calcolato nel tempo. Le scorte si aggiornano solo con ➕ Ricarica o 🔄 Correggi.'
-            : "Determina sia il consumo scorte sia il promemoria dose. Es. una pastiglia al giorno → ogni 1 giorno; un'iniezione ogni 15gg → ogni 15 giorni; una pastiglia solo giovedì e domenica → giorni della settimana."}
+            ? 'Per cambiare questi valori elimina questa terapia e creane una nuova: determinano il consumo scorte già calcolato nel tempo. Le scorte si aggiornano solo con ➕ Ricarica, ➖ Consumo o 🔄 Correggi.'
+            : scheduleType === 'occasional'
+              ? 'Per uso saltuario senza schema fisso (es. un antidolorifico preso solo quando serve): niente promemoria dose, le scorte scendono solo quando registri un ➖ Consumo.'
+              : "Determina sia il consumo scorte sia il promemoria dose. Es. una pastiglia al giorno → ogni 1 giorno; un'iniezione ogni 15gg → ogni 15 giorni; una pastiglia solo giovedì e domenica → giorni della settimana."}
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -387,6 +391,56 @@ function RestockControl({ medicine, onRestocked }) {
   )
 }
 
+// ── Consumo extra / occasionale ───────────────────────────────────
+// Scala subito le scorte di una quantità indicata, invece di aspettare che
+// lo schema calcolato se ne accorga. Serve sia per una dose extra non
+// prevista dallo schema, sia (soprattutto) per le terapie "Al bisogno", le
+// cui scorte non scalano mai da sole: qui è l'unico modo di tenerle aggiornate.
+function ConsumeStockControl({ medicine, onConsumed }) {
+  const [open,   setOpen]   = useState(false)
+  const [amount, setAmount] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function confirm() {
+    const used = Number(amount)
+    if (!used || used <= 0) { setOpen(false); return }
+    setSaving(true)
+    const newStock = Math.max(0, currentStock(medicine) - used)
+    const asOf = todayStr()
+    const { error } = await supabase.from('medicines').update({ stock_units: newStock, stock_as_of: asOf }).eq('id', medicine.id)
+    setSaving(false)
+    if (!error) onConsumed(medicine.id, newStock, asOf)
+    setOpen(false)
+    setAmount('')
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => { setOpen(true); setAmount(String(medicine.units_per_intake || '')) }}
+        style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: '#38bdf8', padding: '5px 10px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}>
+        ➖ Consumo
+      </button>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+      <input autoFocus type="number" min="0" step="0.5" value={amount}
+        onChange={e => setAmount(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && confirm()}
+        placeholder="Qtà"
+        style={{ width: '64px', background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', padding: '5px 8px', color: '#f1f5f9', fontSize: '0.8rem' }} />
+      <button onClick={confirm} disabled={saving}
+        style={{ background: '#075985', border: 'none', borderRadius: '6px', color: '#fff', padding: '5px 10px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}>
+        ✓
+      </button>
+      <button onClick={() => { setOpen(false); setAmount('') }}
+        style={{ background: 'none', border: 'none', color: '#64748b', padding: '5px 6px', fontSize: '0.75rem', cursor: 'pointer' }}>
+        ✕
+      </button>
+    </div>
+  )
+}
+
 // ── Correzione scorte (reset a un valore esatto in una data indicata) ────
 // Da usare quando il conteggio calcolato si è disallineato dalla realtà
 // (es. medicine perse/scadute/buttate): sovrascrive scorte e data di
@@ -440,7 +494,7 @@ function ResetStockControl({ medicine, onReset }) {
 }
 
 // ── Card singola terapia ─────────────────────────────────────────
-function MedicineCard({ medicine, isOwner, onEdit, onRestocked, onReset }) {
+function MedicineCard({ medicine, isOwner, onEdit, onRestocked, onConsumed, onReset }) {
   const status = stockStatus(medicine)
   const dc = dailyConsumption(medicine)
   const dr = daysRemaining(medicine)
@@ -494,6 +548,7 @@ function MedicineCard({ medicine, isOwner, onEdit, onRestocked, onReset }) {
       {isOwner && (
         <div style={{ marginTop: '4px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <RestockControl medicine={medicine} onRestocked={onRestocked} />
+          <ConsumeStockControl medicine={medicine} onConsumed={onConsumed} />
           <ResetStockControl medicine={medicine} onReset={onReset} />
         </div>
       )}
@@ -627,6 +682,7 @@ export default function MedicinesSection({ session }) {
                 isOwner={m.user_id === currentUserId}
                 onEdit={setEditMedicine}
                 onRestocked={applyRestock}
+                onConsumed={applyRestock}
                 onReset={applyRestock}
               />
             ))}

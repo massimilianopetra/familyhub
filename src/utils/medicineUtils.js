@@ -18,6 +18,14 @@ function isWeekdaySchedule(m) {
   return m.schedule_type === 'weekdays'
 }
 
+// Terapie ad uso saltuario, senza schema fisso (es. antidolorifico preso solo
+// quando serve): niente scalo automatico delle scorte, niente promemoria
+// "prossima dose" — le scorte si muovono solo con le azioni manuali
+// (Ricarica / Correggi / Consumo).
+function isOccasionalSchedule(m) {
+  return m.schedule_type === 'occasional'
+}
+
 function weekdaySet(m) {
   return new Set((m.weekdays || []).map(Number))
 }
@@ -32,6 +40,7 @@ function doseInterval(m) {
 // Quante unità (compresse, ml, bustine...) si consumano al giorno in media
 export function dailyConsumption(m) {
   if (!m.is_active) return 0
+  if (isOccasionalSchedule(m)) return 0
   const units = Number(m.units_per_intake || 0)
   if (isWeekdaySchedule(m)) return units * weekdaySet(m).size / 7
   return units / doseInterval(m)
@@ -86,6 +95,7 @@ function dosesTakenSinceWeekdays(m, sinceStr) {
 }
 
 function dosesTakenSince(m, sinceStr) {
+  if (isOccasionalSchedule(m)) return 0
   return isWeekdaySchedule(m) ? dosesTakenSinceWeekdays(m, sinceStr) : dosesTakenSinceInterval(m, sinceStr)
 }
 
@@ -115,6 +125,7 @@ export function displayStock(m) {
 // oppure "1 compressa: giovedì, domenica" per la posologia settimanale)
 export function doseScheduleLabel(m) {
   const units = Number(m.units_per_intake || 0)
+  if (isOccasionalSchedule(m)) return `${units} ${m.unit_label}: al bisogno`
   if (isWeekdaySchedule(m)) {
     const days = weekdaySet(m)
     const names = WEEKDAY_ORDER.filter(d => days.has(d)).map(d => WEEKDAY_NAMES[d].toLowerCase())
@@ -171,12 +182,14 @@ function nextDoseDateWeekdays(m) {
 }
 
 export function nextDoseDate(m) {
+  if (isOccasionalSchedule(m)) return null
   return isWeekdaySchedule(m) ? nextDoseDateWeekdays(m) : nextDoseDateInterval(m)
 }
 
 // Stato della prossima dose: colore + etichetta in base a quanto manca
 export function nextDoseStatus(m) {
   if (!m.is_active) return null
+  if (isOccasionalSchedule(m)) return null // nessuno schema fisso, nessun promemoria
   const nd = nextDoseDate(m)
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const target = new Date(nd + 'T00:00:00')
@@ -191,6 +204,7 @@ export function nextDoseStatus(m) {
 // Stato scorte: colore + etichetta, per badge e avvisi
 export function stockStatus(m) {
   if (!m.is_active) return { level: 'inactive', color: '#64748b', label: 'Terapia sospesa' }
+  if (isOccasionalSchedule(m)) return { level: 'occasional', color: '#38bdf8', label: 'Uso occasionale' }
   const dr = daysRemaining(m)
   if (dr == null) return { level: 'unknown', color: '#64748b', label: 'Consumo non impostato' }
   if (dr <= 0) return { level: 'critical', color: '#ef4444', label: 'Scorte esaurite' }
