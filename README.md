@@ -11,7 +11,7 @@ Ottimizzata per cellulare, installabile da Chrome come app standalone.
 
 Calendario completo con tre viste: **Mese**, **Settimana**, **Giorno**.
 
-- **Turni di lavoro di Rosy** — ciclo fisso di 24 settimane calcolato dinamicamente; turni mattutini (fine ≤ 14:00) in verde, pomeridiani/serali in arancio. Toggle per mostrare/nascondere.
+- **Turni di lavoro di Rosy** — ciclo fisso di 24 settimane calcolato dinamicamente; turni mattutini (fine ≤ 14:00) in verde, pomeridiani/serali in arancio. Toggle per mostrare/nascondere. *Visibile solo alla famiglia Petra* (è un turno reale di una persona specifica, non una funzionalità generica): per qualunque altra famiglia il toggle non compare affatto.
 - **Eventi personali** — ogni utente può creare eventi salvati su Supabase con: tipologia, titolo, data inizio e fine (anche multi-giorno), orari opzionali e note.
 - **Tipologie evento** con colore e icona dedicati:
 
@@ -119,6 +119,14 @@ La funzione di valutazione scorre tutte le finestre di 4 celle (orizzontali, ver
 - 2 avversarie + 2 vuote: −5;
 - bonus per le pedine proprie nella colonna centrale (colonna più versatile).
 
+### 👪 Famiglia
+
+Sistema multi-famiglia: ogni utente appartiene a una famiglia, e vede i dati condivisi (calendario, tessere, medicine) solo dei membri della propria.
+
+- **Onboarding obbligatorio** — dopo il login, chi non appartiene ancora a nessuna famiglia deve **crearne una** (diventandone capofamiglia) oppure **richiedere di unirsi** a una famiglia esistente inserendo il suo codice invito. Finché la richiesta non è approvata resta bloccato su una schermata di attesa.
+- **Codice invito** — ogni famiglia ha un codice breve (es. `AB3K7Q`) che qualunque membro approvato può vedere e condividere; solo il capofamiglia può rigenerarlo (invalida il precedente).
+- **Approvazione** — solo il **capofamiglia** vede le richieste in sospeso e può approvarle/rifiutarle dalla sezione "Famiglia"; può anche rimuovere un membro. Un membro normale può vedere l'elenco famiglia e uscirne (il capofamiglia no, per ora — non c'è ancora "trasferisci leadership").
+
 ### ⚙️ Pannello Admin *(solo super user)*
 
 Visibile esclusivamente all'account amministratore. Permette di:
@@ -133,6 +141,15 @@ Visibile esclusivamente all'account amministratore. Permette di:
 - Reset password via email
 - Registrazione nuovi utenti controllata dall'Admin
 - Sessione persistente
+- Dopo la registrazione, Supabase invia una vera email di conferma: l'utente non può fare login finché non clicca il link. **Per un account di test con un'email inesistente** (es. su un dominio che non controlli), può restare bloccato in "Waiting for verification" per sempre. Per sbloccarlo manualmente:
+  1. Prova prima da Dashboard Supabase → **Authentication → Users** → apri l'utente → cerca un'azione "Confirm email" (dipende dalla versione del dashboard, spesso non c'è un pulsante diretto).
+  2. Se non c'è, usa l'**SQL Editor**:
+     ```sql
+     update auth.users
+     set email_confirmed_at = now()
+     where email = 'indirizzo@esempio.it';
+     ```
+     (non toccare `confirmed_at`: è calcolato automaticamente da `email_confirmed_at`, in alcune versioni è addirittura una colonna generata che rifiuta l'update diretto)
 
 ---
 
@@ -144,8 +161,12 @@ Visibile esclusivamente all'account amministratore. Permette di:
 | `app_settings` | Impostazioni globali dell'app (es. `registration_enabled`) |
 | `payments` | Pagamenti/bollette con `user_id`, titolo, importo, categoria, scadenza, stato pagato, ricorrenza |
 | `loyalty_cards` | Tessere fedeltà con `user_id`, nome negozio, valore e formato barcode, colore |
+| `families` | Famiglie: nome, codice invito, `leader_user_id` |
+| `family_members` | Appartenenza famiglia: `user_id`, `family_id`, `role` (leader/member), `status` (pending/approved) |
 
-Row Level Security abilitata: ogni utente può modificare solo i propri eventi; tutti possono leggere.
+Row Level Security abilitata: ogni utente può modificare solo i propri eventi; tutti possono leggere (per ora — vedi nota sotto sulla migrazione a visibilità per famiglia). `families`/`family_members` non si toccano quasi mai direttamente: le operazioni passano da funzioni SQL `SECURITY DEFINER` (`create_family`, `request_join_family`, `approve_member`, ecc. — vedi [supabase/families.sql](supabase/families.sql)) chiamate via `supabase.rpc(...)`.
+
+> **Nota**: `calendar_events`, `loyalty_cards`, `medicines` sono ancora visibili a *tutti* gli utenti autenticati (non solo alla propria famiglia) — l'introduzione di `families`/`family_members` è il primo passo di una migrazione a visibilità per famiglia, non ancora completata.
 
 ---
 

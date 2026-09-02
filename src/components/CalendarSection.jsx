@@ -4,6 +4,12 @@ import { generateMonthShifts, generateRangeShifts } from '../utils/workShift'
 import { EVENT_TYPES, getEventType } from '../utils/eventTypes'
 import { saveCache, loadCache } from '../utils/offlineCache'
 
+// "Turni Rosy" è una funzionalità fatta su misura per una singola famiglia
+// (il ciclo di turni fisso in workShift.js è quello reale di Rosy), non un
+// generico calendario turni — quindi va mostrata solo a quella famiglia,
+// non a tutte le famiglie che in futuro useranno l'app.
+const ROSY_SHIFTS_FAMILY_ID = '38d64c93-6e6f-443d-a163-9e31a998d6bd'
+
 const MONTHS_IT    = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
 const MONTHS_SHORT = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
 const DAYS_SHORT   = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom']
@@ -696,6 +702,7 @@ export default function CalendarSection({ session }) {
   const [view,         setView]         = useState('month')
   const [currentDate,  setCurrentDate]  = useState(new Date(today))
   const [showShifts,   setShowShifts]   = useState(true)
+  const [isRosyFamily, setIsRosyFamily] = useState(false)
   const [onlyMyEvents, setOnlyMyEvents] = useState(true)
   const [dbEvents,     setDbEvents]     = useState([])
   const [offline,      setOffline]      = useState(false)
@@ -705,6 +712,13 @@ export default function CalendarSection({ session }) {
   const currentUserId = session?.user?.id
 
   useEffect(() => { fetchEvents() }, [])
+
+  useEffect(() => {
+    supabase.rpc('my_family_info').then(({ data, error }) => {
+      if (error) { console.error('[Calendar] my_family_info error:', error); return }
+      setIsRosyFamily(data?.[0]?.family_id === ROSY_SHIFTS_FAMILY_ID)
+    })
+  }, [])
 
   async function fetchEvents() {
     try {
@@ -744,7 +758,7 @@ export default function CalendarSection({ session }) {
     if (view === 'month') {
       const y = currentDate.getFullYear()
       const m = currentDate.getMonth()
-      return { shifts: generateMonthShifts(y, m), title: `${MONTHS_IT[m]} ${y}` }
+      return { shifts: isRosyFamily ? generateMonthShifts(y, m) : [], title: `${MONTHS_IT[m]} ${y}` }
     }
     if (view === 'week') {
       const mon = getMonday(currentDate)
@@ -752,10 +766,10 @@ export default function CalendarSection({ session }) {
       const title = mon.getMonth() === sun.getMonth()
         ? `${mon.getDate()} – ${sun.getDate()} ${MONTHS_IT[mon.getMonth()]} ${mon.getFullYear()}`
         : `${mon.getDate()} ${MONTHS_SHORT[mon.getMonth()]} – ${sun.getDate()} ${MONTHS_SHORT[sun.getMonth()]} ${sun.getFullYear()}`
-      return { shifts: generateRangeShifts(mon, sun), title }
+      return { shifts: isRosyFamily ? generateRangeShifts(mon, sun) : [], title }
     }
-    return { shifts: generateRangeShifts(currentDate, currentDate), title: fmtDateFull(currentDate) }
-  }, [view, currentDate])
+    return { shifts: isRosyFamily ? generateRangeShifts(currentDate, currentDate) : [], title: fmtDateFull(currentDate) }
+  }, [view, currentDate, isRosyFamily])
 
   function navigate(delta) {
     const d = new Date(currentDate)
@@ -784,14 +798,14 @@ export default function CalendarSection({ session }) {
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'12px', flexWrap:'wrap' }}>
           <button style={hdr.todayBtn} onClick={goToday}>Oggi</button>
           <ViewSelector view={view} setView={setView} />
-          <Toggle checked={showShifts}   onChange={setShowShifts}   label="Turni Rosy" />
+          {isRosyFamily && <Toggle checked={showShifts} onChange={setShowShifts} label="Turni Rosy" />}
           <Toggle checked={onlyMyEvents} onChange={setOnlyMyEvents} label="Solo miei" />
         </div>
       </div>
 
       {offline && <OfflineBanner />}
 
-      {showShifts && <Legend />}
+      {isRosyFamily && showShifts && <Legend />}
 
       {/* ── Contenuto vista ────────────────────────────────── */}
       {view === 'month' && (
@@ -799,7 +813,7 @@ export default function CalendarSection({ session }) {
           year={currentDate.getFullYear()}
           month={currentDate.getMonth()}
           shifts={shifts}
-          showShifts={showShifts}
+          showShifts={showShifts && isRosyFamily}
           dbEvents={filteredEvents}
           currentUserId={currentUserId}
           onDayClick={goToDay}
@@ -811,7 +825,7 @@ export default function CalendarSection({ session }) {
         <WeekView
           monday={getMonday(currentDate)}
           shifts={shifts}
-          showShifts={showShifts}
+          showShifts={showShifts && isRosyFamily}
           dbEvents={filteredEvents}
           currentUserId={currentUserId}
           onDayClick={goToDay}
@@ -822,7 +836,7 @@ export default function CalendarSection({ session }) {
         <DayView
           day={currentDate}
           shifts={shifts}
-          showShifts={showShifts}
+          showShifts={showShifts && isRosyFamily}
           dbEvents={filteredEvents}
           currentUserId={currentUserId}
           onAddEvent={() => setAddModal(currentDate)}
