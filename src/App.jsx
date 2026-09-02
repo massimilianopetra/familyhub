@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import AuthScreen from './components/AuthScreen'
 import ResetPasswordScreen from './components/ResetPasswordScreen'
 import Dashboard from './components/Dashboard'
+import FamilyGate from './components/FamilyGate'
 
 // Componente Principale
 export default function App() {
@@ -51,5 +52,9 @@ export default function App() {
       <AuthScreen setErrore={setErrore} />
     </div>
   )
-  return <Dashboard session={session} />
+  return (
+    <FamilyGate>
+      <Dashboard session={session} />
+    </FamilyGate>
+  )
 }
