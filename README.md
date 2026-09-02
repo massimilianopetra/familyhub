@@ -164,9 +164,7 @@ Visibile esclusivamente all'account amministratore. Permette di:
 | `families` | Famiglie: nome, codice invito, `leader_user_id` |
 | `family_members` | Appartenenza famiglia: `user_id`, `family_id`, `role` (leader/member), `status` (pending/approved) |
 
-Row Level Security abilitata: ogni utente può modificare solo i propri eventi; tutti possono leggere (per ora — vedi nota sotto sulla migrazione a visibilità per famiglia). `families`/`family_members` non si toccano quasi mai direttamente: le operazioni passano da funzioni SQL `SECURITY DEFINER` (`create_family`, `request_join_family`, `approve_member`, ecc. — vedi [supabase/families.sql](supabase/families.sql)) chiamate via `supabase.rpc(...)`.
-
-> **Nota**: `calendar_events`, `loyalty_cards`, `medicines` sono ancora visibili a *tutti* gli utenti autenticati (non solo alla propria famiglia) — l'introduzione di `families`/`family_members` è il primo passo di una migrazione a visibilità per famiglia, non ancora completata.
+Row Level Security abilitata: ogni utente può modificare solo i propri eventi; la lettura è condivisa solo all'interno della propria famiglia (`family_id`), non più con tutti gli utenti dell'app. `families`/`family_members` non si toccano quasi mai direttamente: le operazioni passano da funzioni SQL `SECURITY DEFINER` (`create_family`, `request_join_family`, `approve_member`, ecc. — vedi [supabase/families.sql](supabase/families.sql)) chiamate via `supabase.rpc(...)`.
 
 ---
 
