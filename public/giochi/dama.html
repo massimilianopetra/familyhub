@@ -11,10 +11,16 @@
             --p1: #3498db; --p2: #2ecc71; --accent: #f1c40f;
         }
         * { box-sizing: border-box; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        /* height (non min-height) + overflow:hidden: qui vh è l'altezza reale
+           dell'iframe, non della finestra del browser — il contenuto deve
+           sempre stare esattamente dentro quello spazio, mai oltre. */
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
         h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size: 1rem; }
         .subtitle { margin-bottom: 6px; color: #a0a2b1; font-size: 0.7rem; text-align: center; }
-        .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 380px; }
+        /* flex column + min-height:0: la card si allunga a riempire tutta
+           l'altezza disponibile, così .board-wrap sotto (flex:1) può usare
+           esattamente lo spazio che resta dopo le fasce sopra. */
+        .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 380px; display: flex; flex-direction: column; min-height: 0; flex: 1; }
         @media (min-width: 700px) { .game-container { max-width: 640px; } }
 
         .top-controls { display: flex; gap: 5px; margin-bottom: 6px; }
@@ -34,8 +40,13 @@
         .message-bar.highlight { color: var(--accent); font-weight: bold; }
         .message-bar.warn { color: #ff5555; font-weight: bold; }
 
-        .board-wrap { background: #2b2f3d; border-radius: 8px; padding: 6px; margin-bottom: 6px; }
-        .board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+        /* container-type:size abilita cqh sotto (100cqh = altezza reale
+           rimasta qui, dopo le fasce fisse sopra); flex:1 assorbe lo spazio
+           verticale avanzato. */
+        .board-wrap { background: #2b2f3d; border-radius: 8px; padding: 6px; margin-bottom: 6px; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; container-type: size; }
+        /* Scacchiera quadrata, grande quanto lo spazio disponibile lo
+           consente sia in larghezza (100%) sia in altezza (100cqh). */
+        .board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; width: min(100%, 100cqh); aspect-ratio: 1; }
         .cell { aspect-ratio: 1; border-radius: 3px; display: flex; align-items: center; justify-content: center; cursor: default; position: relative; }
         .cell.light { background: #3a3d4d; }
         .cell.dark { background: #14151c; }

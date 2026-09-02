@@ -11,10 +11,15 @@
             --p1: #3498db; --p2: #2ecc71; --accent: #f1c40f;
         }
         * { box-sizing: border-box; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        /* height (non min-height) + overflow:hidden: qui vh è l'altezza reale
+           dell'iframe — il contenuto deve sempre starci dentro. */
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
         h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size: 1rem; }
         .subtitle { margin-bottom: 6px; color: #a0a2b1; font-size: 0.7rem; }
-        .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 420px; }
+        /* flex column + min-height:0: la card si allunga a riempire tutta
+           l'altezza disponibile, così .board-wrap sotto (flex:1) può usare
+           esattamente lo spazio che resta dopo le fasce sopra. */
+        .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 420px; display: flex; flex-direction: column; min-height: 0; flex: 1; }
         @media (min-width: 700px) { .game-container { max-width: 640px; } }
 
         /* top controls */
@@ -53,9 +58,13 @@
         .btn-roll { flex: 1; padding: 8px; border: none; border-radius: 6px; background: var(--accent); color: #111; font-weight: bold; font-size: 0.82rem; cursor: pointer; transition: opacity 0.15s; }
         .btn-roll:disabled { opacity: 0.35; cursor: default; }
 
-        /* tabellone SVG */
-        .board-wrap { background: var(--empty); border-radius: 8px; padding: 6px; margin-bottom: 6px; overflow: hidden; }
-        #bg-svg { width: 100%; height: auto; display: block; }
+        /* tabellone SVG: container-type:size abilita cqh (100cqh = altezza
+           reale rimasta dopo le fasce sopra); flex:1 assorbe lo spazio
+           avanzato. Il viewBox è 400x332 (rapporto ~1.2048:1): la larghezza
+           dell'SVG è limitata sia dal 100% orizzontale sia, tramite quel
+           rapporto, dall'altezza disponibile — mai più alto dello spazio. */
+        .board-wrap { background: var(--empty); border-radius: 8px; padding: 6px; margin-bottom: 6px; overflow: hidden; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; container-type: size; }
+        #bg-svg { width: min(100%, calc(100cqh * 400 / 332)); height: auto; display: block; }
 
         /* pulsante fine turno */
         .action-buttons { display: flex; gap: 5px; margin-bottom: 6px; }
