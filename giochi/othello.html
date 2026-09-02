@@ -15,7 +15,13 @@
         h1 { margin: 0 0 1px; text-transform: uppercase; letter-spacing: 2px; font-size: 1rem; }
         .subtitle { margin-bottom: 6px; color: #a0a2b1; font-size: 0.7rem; }
         .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 380px; }
-        @media (min-width: 700px) { .game-container { max-width: 640px; } }
+        /* Su desktop la scacchiera scala con la larghezza dello schermo, ma va
+           limitata anche dall'altezza disponibile (qui vh = altezza reale
+           dell'iframe, non della finestra): senza questo limite, su schermi
+           bassi la scacchiera 8x8 + le fasce sopra (titolo, modalità,
+           punteggio, messaggi: ~280px) superano lo spazio a disposizione e il
+           gioco finisce col proprio scroll interno invece di stare tutto a vista. */
+        @media (min-width: 700px) { .game-container { max-width: min(640px, calc(100vh - 300px)); } }
 
         .top-controls { display: flex; gap: 5px; margin-bottom: 6px; }
         .btn-mode { flex: 1; padding: 6px 4px; border: 2px solid var(--hidden); border-radius: 6px; background: var(--empty); color: #a0a2b1; font-weight: bold; font-size: 0.7rem; cursor: pointer; transition: all 0.15s; }
