@@ -667,6 +667,7 @@ function MonthlyReport({ payments, categories }) {
   // per famiglia) compare già spuntata senza bisogno di sincronizzare uno stato
   // "selezionate" ogni volta che cambia l'elenco.
   const [excluded, setExcluded] = useState(new Set())
+  const [periodMode, setPeriodMode] = useState('mensile') // 'mensile' | 'annuale'
 
   useEffect(() => {
     let cancelled = false
@@ -712,32 +713,47 @@ function MonthlyReport({ payments, categories }) {
   const hasConfirmed = payments.some(p => p.is_paid && p.paid_at)
   const visible      = payments.filter(p => !excluded.has(catKey(p.type, p.category)))
 
-  // { 'YYYY-MM': { [user_id]: { spesa, entrata } } }, solo movimenti confermati
-  const byMonth = {}
+  // Chiave/etichetta di raggruppamento, dipendenti dal periodMode corrente:
+  // 'YYYY-MM' con etichetta "settembre 2026" in mensile, solo 'YYYY' con
+  // etichetta "2026" in annuale. Un'unica funzione usata sia per costruire
+  // byPeriod sia per l'export CSV, così i due restano sempre coerenti.
+  function periodKey(d) {
+    return periodMode === 'annuale'
+      ? `${d.getFullYear()}`
+      : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  function periodLabel(key) {
+    return periodMode === 'annuale'
+      ? key
+      : new Date(`${key}-01T00:00:00`).toLocaleString('it-IT', { month: 'long', year: 'numeric' })
+  }
+
+  // { <periodKey>: { [user_id]: { spesa, entrata } } }, solo movimenti confermati
+  const byPeriod = {}
   for (const p of visible) {
     if (!p.is_paid || !p.paid_at) continue
-    const d   = new Date(p.paid_at)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    byMonth[key] ??= {}
-    byMonth[key][p.user_id] ??= { spesa: 0, entrata: 0 }
-    byMonth[key][p.user_id][p.type === 'entrata' ? 'entrata' : 'spesa'] += Number(p.amount)
+    const key = periodKey(new Date(p.paid_at))
+    byPeriod[key] ??= {}
+    byPeriod[key][p.user_id] ??= { spesa: 0, entrata: 0 }
+    byPeriod[key][p.user_id][p.type === 'entrata' ? 'entrata' : 'spesa'] += Number(p.amount)
   }
-  const months = Object.keys(byMonth).sort().reverse()
+  const periods = Object.keys(byPeriod).sort().reverse()
 
   // Esporta esattamente quello che è a schermo: rispetta il filtro categorie
-  // corrente (usa `visible`/`byMonth`, non `payments`/tutte le categorie).
-  // Due sezioni nello stesso file: dettaglio movimento-per-movimento (con
-  // categoria, così si può fare un pivot in Excel) e lo stesso riepilogo
-  // mensile per membro già mostrato nelle tabelle sotto.
+  // corrente (usa `visible`/`byPeriod`, non `payments`/tutte le categorie) e
+  // il periodMode corrente (mensile/annuale). Due sezioni nello stesso file:
+  // dettaglio movimento-per-movimento (con categoria, così si può fare un
+  // pivot in Excel) e lo stesso riepilogo per periodo già mostrato sotto.
   function handleExportCsv() {
-    const rows = [['Mese', 'Membro', 'Tipo', 'Categoria', 'Titolo', 'Data', 'Importo (€)']]
+    const periodColLabel = periodMode === 'annuale' ? 'Anno' : 'Mese'
+    const rows = [[periodColLabel, 'Membro', 'Tipo', 'Categoria', 'Titolo', 'Data', 'Importo (€)']]
     const detail = visible
       .filter(p => p.is_paid && p.paid_at)
       .sort((a, b) => new Date(b.paid_at) - new Date(a.paid_at))
     for (const p of detail) {
       const d = new Date(p.paid_at)
       rows.push([
-        d.toLocaleString('it-IT', { month: 'long', year: 'numeric' }),
+        periodLabel(periodKey(d)),
         memberLabel(p.user_id),
         getPaymentType(p.type).label,
         p.category,
@@ -748,12 +764,12 @@ function MonthlyReport({ payments, categories }) {
     }
 
     rows.push([])
-    rows.push(['Riepilogo mensile per membro'])
-    rows.push(['Mese', 'Membro', 'Spese (€)', 'Entrate (€)', 'Saldo (€)'])
-    for (const month of months) {
-      const rowsByUser = byMonth[month]
+    rows.push([`Riepilogo ${periodMode} per membro`])
+    rows.push([periodColLabel, 'Membro', 'Spese (€)', 'Entrate (€)', 'Saldo (€)'])
+    for (const period of periods) {
+      const rowsByUser = byPeriod[period]
       const userIds = Object.keys(rowsByUser).sort((a, b) => memberLabel(a).localeCompare(memberLabel(b)))
-      const label = new Date(`${month}-01T00:00:00`).toLocaleString('it-IT', { month: 'long', year: 'numeric' })
+      const label = periodLabel(period)
       let totSpesa = 0, totEntrata = 0
       for (const u of userIds) {
         const { spesa, entrata } = rowsByUser[u]
@@ -777,6 +793,19 @@ function MonthlyReport({ payments, categories }) {
           {membersError}
         </div>
       )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #ccc' }}>
+          <button onClick={() => setPeriodMode('mensile')}
+            style={{ ...viewTabBtn, backgroundColor: periodMode === 'mensile' ? '#1c1c1c' : 'transparent', color: periodMode === 'mensile' ? '#fff' : '#444' }}>
+            Mensile
+          </button>
+          <button onClick={() => setPeriodMode('annuale')}
+            style={{ ...viewTabBtn, backgroundColor: periodMode === 'annuale' ? '#1c1c1c' : 'transparent', color: periodMode === 'annuale' ? '#fff' : '#444' }}>
+            Annuale
+          </button>
+        </div>
+      </div>
 
       {allCategories.length > 0 && (
         <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
@@ -808,7 +837,7 @@ function MonthlyReport({ payments, categories }) {
         </div>
       )}
 
-      {months.length === 0 ? (
+      {periods.length === 0 ? (
         <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: 32, textAlign: 'center', color: '#888', fontSize: 14 }}>
           {hasConfirmed
             ? 'Nessun movimento con le categorie selezionate.'
@@ -817,20 +846,20 @@ function MonthlyReport({ payments, categories }) {
       ) : (
       <>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <button onClick={handleExportCsv} title="Dettaglio movimenti + riepilogo mensile per membro, con le categorie attualmente selezionate"
+        <button onClick={handleExportCsv} title="Dettaglio movimenti + riepilogo per periodo per membro, con le categorie attualmente selezionate"
           style={{ backgroundColor: '#3ecf8e', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 600, cursor: 'pointer', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           ⬇️ Esporta CSV
         </button>
       </div>
-      {months.map(month => {
-        const rows = byMonth[month]
+      {periods.map(period => {
+        const rows = byPeriod[period]
         const userIds = Object.keys(rows).sort((a, b) => memberLabel(a).localeCompare(memberLabel(b)))
         const totSpesa   = userIds.reduce((s, u) => s + rows[u].spesa, 0)
         const totEntrata = userIds.reduce((s, u) => s + rows[u].entrata, 0)
-        const label = new Date(`${month}-01T00:00:00`).toLocaleString('it-IT', { month: 'long', year: 'numeric' })
+        const label = periodLabel(period)
 
         return (
-          <div key={month} style={{ marginBottom: 24 }}>
+          <div key={period} style={{ marginBottom: 24 }}>
             <div style={sLabel}>{label}</div>
             <div style={{ overflowX: 'auto', backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 420 }}>
