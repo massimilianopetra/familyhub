@@ -17,6 +17,12 @@ export function getPaymentType(id) {
   return PAYMENT_TYPES.find(t => t.id === id) ?? PAYMENT_TYPES[0]
 }
 
+// Le categorie vere e proprie vivono ora nella tabella payment_categories
+// (personalizzabile per famiglia, vedi supabase/payment_categories.sql):
+// PaymentsScreen.jsx le carica da lì, non da qui. Queste due liste restano
+// solo (a) il seed usato dallo script SQL e da create_family() per popolare
+// le categorie di default di ogni famiglia, e (b) il fallback mostrato nel
+// form finché quella fetch non è ancora tornata.
 export const EXPENSE_CATEGORIES = [
   'Tasse', 'Tassa Rifiuti', 'IMU', 'Bollo Auto', 'SMAT', 'Luce', 'Gas',
   'Acqua', 'Internet', 'Mutuo/Affitto', 'Bolletta', 'Assicurazione',
@@ -24,7 +30,3 @@ export const EXPENSE_CATEGORIES = [
 ]
 
 export const INCOME_CATEGORIES = ['Stipendio', 'Bonus', 'Regalo', 'Altro']
-
-export function categoriesFor(type) {
-  return type === 'entrata' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
-}

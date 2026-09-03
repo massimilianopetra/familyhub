@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { PAYMENT_TYPES, getPaymentType, categoriesFor } from '../utils/paymentTypes'
+import { PAYMENT_TYPES, getPaymentType, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../utils/paymentTypes'
 
 function calcNextDue(baseDate, interval) {
   const d = new Date(baseDate)
@@ -31,6 +31,27 @@ function downloadIcs(payment) {
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href = url; a.download = `${payment.title.replace(/\s+/g,'_')}.ics`
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// CSV con delimitatore ";" e virgola come separatore decimale: è il formato
+// che Excel in locale it-IT si aspetta di default (con la virgola come
+// delimitatore, un numero con la virgola verrebbe letto come due colonne).
+function csvEscape(val) {
+  const s = String(val ?? '')
+  return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+function csvAmount(n) { return n.toFixed(2).replace('.', ',') }
+
+function downloadCsv(filename, rows) {
+  // BOM iniziale: senza, Excel apre l'UTF-8 interpretando male le lettere
+  // accentate (è, à, ù...) usate nelle etichette italiane.
+  const csv  = '﻿' + rows.map(r => r.map(csvEscape).join(';')).join('\r\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url; a.download = filename
   document.body.appendChild(a); a.click(); document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
@@ -69,10 +90,17 @@ export default function PaymentsScreen({ user }) {
   const [onlyMine,    setOnlyMine]    = useState(true)
   const [markingPaid, setMarkingPaid] = useState(null) // { id, date }
   const [editingId,   setEditingId]   = useState(null)
-  const [view,        setView]        = useState('lista') // 'lista' | 'rendiconto'
+  const [view,        setView]        = useState('lista') // 'lista' | 'rendiconto' | 'categorie'
+  // Categorie di famiglia (tabella payment_categories, vedi supabase/payment_categories.sql).
+  // `categoriesLoaded` distingue "non ancora caricate" (mostra il fallback
+  // statico sotto, per non far comparire una select vuota mentre la fetch è
+  // in volo) da "caricate e la famiglia non ne ha attive" (mostra select
+  // davvero vuota, riflette lo stato reale).
+  const [categories,       setCategories]       = useState([])
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false)
   const formRef = useRef(null)
 
-  useEffect(() => { loadPayments() }, [])
+  useEffect(() => { loadPayments(); loadCategories() }, [])
 
   useEffect(() => {
     if (showForm) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -87,11 +115,41 @@ export default function PaymentsScreen({ user }) {
     setLoading(false)
   }
 
+  async function loadCategories() {
+    const { data, error } = await supabase
+      .from('payment_categories').select('*').order('name')
+    if (!error) setCategories(data || [])
+    setCategoriesLoaded(true)
+  }
+
+  // Nomi attivi per tipo, ordinati; finché la fetch non è tornata usa le
+  // liste statiche di paymentTypes.js solo come placeholder visivo.
+  function activeCategoryNames(type) {
+    if (!categoriesLoaded) return type === 'entrata' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+    return categories
+      .filter(c => c.type === type && c.is_active)
+      .map(c => c.name)
+      .sort((a, b) => a.localeCompare(b, 'it'))
+  }
+
+  // Come activeCategoryNames, ma in modifica inietta anche la categoria
+  // storica del movimento se nel frattempo è stata disattivata — altrimenti
+  // la <select> risulterebbe senza un'opzione corrispondente al valore
+  // corrente, pur restando form.category invariato (nessun dato perso, solo
+  // un dropdown che sembra vuoto).
+  function categoryOptionsFor(type) {
+    const active = activeCategoryNames(type)
+    if (editingId && form.category && !active.includes(form.category)) {
+      return [...active, form.category].sort((a, b) => a.localeCompare(b, 'it'))
+    }
+    return active
+  }
+
   function setField(key, val) { setForm(f => ({ ...f, [key]: val })) }
 
   function setType(type) {
     setForm(f => {
-      const cats = categoriesFor(type)
+      const cats = activeCategoryNames(type)
       return { ...f, type, category: cats.includes(f.category) ? f.category : cats[0] }
     })
   }
@@ -210,11 +268,16 @@ export default function PaymentsScreen({ user }) {
   // ── Derived values ────────────────────────────────────────────────────────
   const filtered = onlyMine ? payments.filter(p => p.user_id === user.id) : payments
 
-  // sort: unpaid first (by due_date asc), then paid (by paid_at desc)
+  // Da pagare/incassare in evidenza prima di tutto (is_paid = false), poi i
+  // già confermati — dentro ciascuno dei due gruppi, ordine cronologico
+  // decrescente per data di inserimento (created_at): il movimento aggiunto
+  // più di recente resta in cima. Scartato l'ordinamento per due_date/paid_at
+  // come unico criterio perché mischia date future (scadenze) e passate
+  // (pagamenti) — "più recente" non ha lo stesso significato per le due,
+  // mentre created_at è univoco per ogni riga.
   const sorted = [...filtered].sort((a, b) => {
-    const da = a.due_date ? new Date(a.due_date) : new Date('9999-12-31')
-    const db = b.due_date ? new Date(b.due_date) : new Date('9999-12-31')
-    return da - db
+    if (a.is_paid !== b.is_paid) return a.is_paid ? 1 : -1
+    return new Date(b.created_at) - new Date(a.created_at)
   })
 
   const now        = new Date()
@@ -268,6 +331,10 @@ export default function PaymentsScreen({ user }) {
               style={{ ...viewTabBtn, backgroundColor: view === 'rendiconto' ? '#1c1c1c' : 'transparent', color: view === 'rendiconto' ? '#fff' : '#444' }}>
               Rendiconto
             </button>
+            <button onClick={() => setView('categorie')}
+              style={{ ...viewTabBtn, backgroundColor: view === 'categorie' ? '#1c1c1c' : 'transparent', color: view === 'categorie' ? '#fff' : '#444' }}>
+              Categorie
+            </button>
           </div>
           {view === 'lista' && (
             <button
@@ -288,7 +355,9 @@ export default function PaymentsScreen({ user }) {
       )}
 
       {view === 'rendiconto' ? (
-        <MonthlyReport payments={payments} />
+        <MonthlyReport payments={payments} categories={categories} />
+      ) : view === 'categorie' ? (
+        <CategoriesManager categories={categories} onReload={loadCategories} />
       ) : (
       <>
       {/* Monthly summary */}
@@ -388,7 +457,7 @@ export default function PaymentsScreen({ user }) {
             <div style={{ flex: 1 }}>
               <label style={lbl}>Categoria</label>
               <select value={form.category} onChange={e => setField('category', e.target.value)} style={inp}>
-                {categoriesFor(form.type).map(c => <option key={c} value={c}>{c}</option>)}
+                {categoryOptionsFor(form.type).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
@@ -590,9 +659,14 @@ export default function PaymentsScreen({ user }) {
 // Per-mese, per-membro: spese/entrate/saldo. Nessuna nuova fetch di righe —
 // riusa `payments` già caricato dal componente padre; carica solo l'elenco
 // membri (email) via list_family_members(), stesso RPC di FamilySection.jsx.
-function MonthlyReport({ payments }) {
+function MonthlyReport({ payments, categories }) {
   const [members, setMembers] = useState(null) // { [user_id]: email } oppure null finché non caricato
   const [membersError, setMembersError] = useState('')
+  // Filtro categorie: tracciamo le ESCLUSE (default: nessuna, cioè tutto spuntato).
+  // Così una categoria mai vista prima (o custom, quando saranno personalizzabili
+  // per famiglia) compare già spuntata senza bisogno di sincronizzare uno stato
+  // "selezionate" ogni volta che cambia l'elenco.
+  const [excluded, setExcluded] = useState(new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -611,9 +685,36 @@ function MonthlyReport({ payments }) {
     return email ? email.split('@')[0] : userId.slice(0, 8)
   }
 
+  // Elenco categorie per le checkbox: unione tra l'elenco di famiglia (così una
+  // categoria appena creata compare subito, anche a zero movimenti) e le
+  // categorie realmente presenti nei movimenti (copre lo storico anche se una
+  // categoria è stata nel frattempo disattivata o non è più nell'elenco).
+  // Chiave = tipo+nome, non solo nome: "Altro" spesa e "Altro" entrata sono
+  // due categorie distinte (stesso nome ammesso per tipi diversi, vedi
+  // l'indice unique su payment_categories), altrimenti finirebbero sotto la
+  // stessa checkbox e si escluderebbero a vicenda.
+  const catKey = (type, name) => `${type}::${name}`
+  const allCategories = (() => {
+    const map = new Map()
+    for (const c of categories) map.set(catKey(c.type, c.name), { type: c.type, name: c.name })
+    for (const p of payments)   map.set(catKey(p.type, p.category), { type: p.type, name: p.category })
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'it'))
+  })()
+
+  function toggleCategory(key) {
+    setExcluded(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
+  const hasConfirmed = payments.some(p => p.is_paid && p.paid_at)
+  const visible      = payments.filter(p => !excluded.has(catKey(p.type, p.category)))
+
   // { 'YYYY-MM': { [user_id]: { spesa, entrata } } }, solo movimenti confermati
   const byMonth = {}
-  for (const p of payments) {
+  for (const p of visible) {
     if (!p.is_paid || !p.paid_at) continue
     const d   = new Date(p.paid_at)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -622,6 +723,48 @@ function MonthlyReport({ payments }) {
     byMonth[key][p.user_id][p.type === 'entrata' ? 'entrata' : 'spesa'] += Number(p.amount)
   }
   const months = Object.keys(byMonth).sort().reverse()
+
+  // Esporta esattamente quello che è a schermo: rispetta il filtro categorie
+  // corrente (usa `visible`/`byMonth`, non `payments`/tutte le categorie).
+  // Due sezioni nello stesso file: dettaglio movimento-per-movimento (con
+  // categoria, così si può fare un pivot in Excel) e lo stesso riepilogo
+  // mensile per membro già mostrato nelle tabelle sotto.
+  function handleExportCsv() {
+    const rows = [['Mese', 'Membro', 'Tipo', 'Categoria', 'Titolo', 'Data', 'Importo (€)']]
+    const detail = visible
+      .filter(p => p.is_paid && p.paid_at)
+      .sort((a, b) => new Date(b.paid_at) - new Date(a.paid_at))
+    for (const p of detail) {
+      const d = new Date(p.paid_at)
+      rows.push([
+        d.toLocaleString('it-IT', { month: 'long', year: 'numeric' }),
+        memberLabel(p.user_id),
+        getPaymentType(p.type).label,
+        p.category,
+        p.title,
+        d.toLocaleDateString('it-IT'),
+        csvAmount(Number(p.amount)),
+      ])
+    }
+
+    rows.push([])
+    rows.push(['Riepilogo mensile per membro'])
+    rows.push(['Mese', 'Membro', 'Spese (€)', 'Entrate (€)', 'Saldo (€)'])
+    for (const month of months) {
+      const rowsByUser = byMonth[month]
+      const userIds = Object.keys(rowsByUser).sort((a, b) => memberLabel(a).localeCompare(memberLabel(b)))
+      const label = new Date(`${month}-01T00:00:00`).toLocaleString('it-IT', { month: 'long', year: 'numeric' })
+      let totSpesa = 0, totEntrata = 0
+      for (const u of userIds) {
+        const { spesa, entrata } = rowsByUser[u]
+        totSpesa += spesa; totEntrata += entrata
+        rows.push([label, memberLabel(u), csvAmount(spesa), csvAmount(entrata), csvAmount(entrata - spesa)])
+      }
+      rows.push([label, 'Totale famiglia', csvAmount(totSpesa), csvAmount(totEntrata), csvAmount(totEntrata - totSpesa)])
+    }
+
+    downloadCsv(`rendiconto_familyhub_${todayStr()}.csv`, rows)
+  }
 
   if (members === null && !membersError) {
     return <div style={{ color: '#94a3b8', textAlign: 'center', padding: 40, fontSize: 14 }}>Caricamento...</div>
@@ -634,11 +777,52 @@ function MonthlyReport({ payments }) {
           {membersError}
         </div>
       )}
+
+      {allCategories.length > 0 && (
+        <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Filtra per categoria</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setExcluded(new Set())}
+                style={{ background: 'transparent', border: '1px solid #ccc', borderRadius: 6, padding: '3px 10px', fontSize: 12, color: '#444', cursor: 'pointer' }}>
+                Tutte
+              </button>
+              <button onClick={() => setExcluded(new Set(allCategories.map(c => catKey(c.type, c.name))))}
+                style={{ background: 'transparent', border: '1px solid #ccc', borderRadius: 6, padding: '3px 10px', fontSize: 12, color: '#444', cursor: 'pointer' }}>
+                Nessuna
+              </button>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+            {allCategories.map(cat => {
+              const key = catKey(cat.type, cat.name)
+              return (
+                <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: cat.type === 'entrata' ? '#2563eb' : '#333', fontWeight: cat.type === 'entrata' ? 600 : 400, cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={!excluded.has(key)} onChange={() => toggleCategory(key)}
+                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#3ecf8e' }} />
+                  {cat.name}
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {months.length === 0 ? (
         <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: 32, textAlign: 'center', color: '#888', fontSize: 14 }}>
-          Nessun movimento confermato ancora — il rendiconto conta solo ciò che è stato segnato come {getPaymentType('spesa').doneLabel.toLowerCase()}/{getPaymentType('entrata').doneLabel.toLowerCase()}.
+          {hasConfirmed
+            ? 'Nessun movimento con le categorie selezionate.'
+            : <>Nessun movimento confermato ancora — il rendiconto conta solo ciò che è stato segnato come {getPaymentType('spesa').doneLabel.toLowerCase()}/{getPaymentType('entrata').doneLabel.toLowerCase()}.</>}
         </div>
-      ) : months.map(month => {
+      ) : (
+      <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <button onClick={handleExportCsv} title="Dettaglio movimenti + riepilogo mensile per membro, con le categorie attualmente selezionate"
+          style={{ backgroundColor: '#3ecf8e', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 600, cursor: 'pointer', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          ⬇️ Esporta CSV
+        </button>
+      </div>
+      {months.map(month => {
         const rows = byMonth[month]
         const userIds = Object.keys(rows).sort((a, b) => memberLabel(a).localeCompare(memberLabel(b)))
         const totSpesa   = userIds.reduce((s, u) => s + rows[u].spesa, 0)
@@ -686,6 +870,150 @@ function MonthlyReport({ payments }) {
           </div>
         )
       })}
+      </>
+      )}
+    </div>
+  )
+}
+
+// ── Gestione categorie ───────────────────────────────────────────────────────
+// Qualsiasi membro di famiglia può creare/rinominare/attivare-disattivare
+// (RLS su payment_categories non è owner-only, vedi supabase/payment_categories.sql).
+// "Eliminare" una categoria è sempre e solo il toggle attiva/disattiva: mai un
+// delete reale, così i movimenti storici che la usano restano interpretabili
+// e non c'è rischio di far sparire una categoria per errore.
+function CategoriesManager({ categories, onReload }) {
+  const [error,      setError]      = useState('')
+  const [saving,     setSaving]     = useState(false)
+  const [newName,    setNewName]    = useState('')
+  const [newType,    setNewType]    = useState('spesa')
+  const [editingCat, setEditingCat] = useState(null) // { id, name }
+
+  function friendlyError(err) {
+    return err.code === '23505' ? 'Categoria già esistente per questo tipo.' : err.message
+  }
+
+  async function handleAdd() {
+    setError('')
+    if (!newName.trim()) { setError('Il nome della categoria è obbligatorio'); return }
+    setSaving(true)
+    const { error } = await supabase
+      .from('payment_categories').insert({ type: newType, name: newName.trim() })
+    if (error) { setError(friendlyError(error)); setSaving(false); return }
+    setNewName('')
+    await onReload()
+    setSaving(false)
+  }
+
+  async function handleToggleActive(cat) {
+    setError('')
+    const { error } = await supabase
+      .from('payment_categories').update({ is_active: !cat.is_active }).eq('id', cat.id)
+    if (error) { setError(error.message); return }
+    await onReload()
+  }
+
+  async function handleRename(cat) {
+    setError('')
+    const name = editingCat.name.trim()
+    if (!name) { setError('Il nome della categoria è obbligatorio'); return }
+    if (name === cat.name) { setEditingCat(null); return }
+    const { error } = await supabase
+      .from('payment_categories').update({ name }).eq('id', cat.id)
+    if (error) { setError(friendlyError(error)); return }
+    setEditingCat(null)
+    await onReload()
+  }
+
+  const byType = {
+    spesa:   categories.filter(c => c.type === 'spesa').sort((a, b) => a.name.localeCompare(b.name, 'it')),
+    entrata: categories.filter(c => c.type === 'entrata').sort((a, b) => a.name.localeCompare(b.name, 'it')),
+  }
+
+  return (
+    <div>
+      {error && (
+        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
+      {/* Nuova categoria */}
+      <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '16px 20px', marginBottom: 24 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: '#111', marginBottom: 14 }}>+ Nuova categoria</div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+          {PAYMENT_TYPES.map(t => (
+            <button key={t.id} type="button" onClick={() => setNewType(t.id)}
+              style={{ flex: 1, padding: '8px 0', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                border: `1px solid ${newType === t.id ? t.color : '#ccc'}`,
+                backgroundColor: newType === t.id ? t.color : 'transparent',
+                color: newType === t.id ? '#fff' : '#444' }}>
+              {t.emoji} {t.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <input type="text" placeholder="Es. Iren, Telepass, Mercato..." value={newName}
+            onChange={e => setNewName(e.target.value)} style={{ ...inp, flex: 1 }} />
+          <button onClick={handleAdd} disabled={saving}
+            style={{ backgroundColor: saving ? '#555' : '#1c1c1c', color: '#fff', border: 'none', borderRadius: 8,
+              padding: '10px 18px', fontWeight: 600, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+            Aggiungi
+          </button>
+        </div>
+      </div>
+
+      {/* Elenco per tipo */}
+      {PAYMENT_TYPES.map(t => (
+        <div key={t.id} style={{ marginBottom: 24 }}>
+          <div style={sLabel}>{t.emoji} {t.label}</div>
+          {byType[t.id].length === 0 ? (
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: 20, textAlign: 'center', color: '#888', fontSize: 13 }}>
+              Nessuna categoria.
+            </div>
+          ) : (
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, overflow: 'hidden' }}>
+              {byType[t.id].map((cat, i) => {
+                const isEditing = editingCat?.id === cat.id
+                return (
+                  <div key={cat.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+                    borderTop: i === 0 ? 'none' : '1px solid #f3f4f6', opacity: cat.is_active ? 1 : 0.55,
+                  }}>
+                    {isEditing ? (
+                      <input type="text" autoFocus value={editingCat.name}
+                        onChange={e => setEditingCat({ id: cat.id, name: e.target.value })}
+                        onKeyDown={e => e.key === 'Enter' && handleRename(cat)}
+                        style={{ ...inp, flex: 1, padding: '6px 10px' }} />
+                    ) : (
+                      <span style={{ flex: 1, fontSize: 14, color: '#111' }}>{cat.name}</span>
+                    )}
+
+                    {isEditing ? (
+                      <>
+                        <button onClick={() => handleRename(cat)}
+                          style={{ backgroundColor: '#1c1c1c', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                          Salva
+                        </button>
+                        <button onClick={() => setEditingCat(null)}
+                          style={{ backgroundColor: 'transparent', color: '#888', border: '1px solid #ddd', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12 }}>
+                          Annulla
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => setEditingCat({ id: cat.id, name: cat.name })}
+                        style={{ backgroundColor: 'transparent', color: '#1c1c1c', border: '1px solid #ccc', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                        ✏️
+                      </button>
+                    )}
+                    <Toggle checked={cat.is_active} onChange={() => handleToggleActive(cat)} label="" />
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
