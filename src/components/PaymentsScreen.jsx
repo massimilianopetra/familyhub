@@ -808,7 +808,7 @@ function MonthlyReport({ payments, categories }) {
       </div>
 
       {allCategories.length > 0 && (
-        <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
+        <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12, padding: '12px 14px', marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Filtra per categoria</span>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -822,7 +822,7 @@ function MonthlyReport({ payments, categories }) {
               </button>
             </div>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px' }}>
             {allCategories.map(cat => {
               const key = catKey(cat.type, cat.name)
               return (
@@ -847,7 +847,7 @@ function MonthlyReport({ payments, categories }) {
       <>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <button onClick={handleExportCsv} title="Dettaglio movimenti + riepilogo per periodo per membro, con le categorie attualmente selezionate"
-          style={{ backgroundColor: '#3ecf8e', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 600, cursor: 'pointer', fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          style={{ backgroundColor: '#3ecf8e', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 14px', fontWeight: 600, cursor: 'pointer', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
           ⬇️ Esporta CSV
         </button>
       </div>
@@ -862,7 +862,7 @@ function MonthlyReport({ payments, categories }) {
           <div key={period} style={{ marginBottom: 24 }}>
             <div style={sLabel}>{label}</div>
             <div style={{ overflowX: 'auto', backgroundColor: '#ffffff', border: '1px solid #eaeaea', borderRadius: 12 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 420 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 300 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #eaeaea' }}>
                     <th style={thStyle}>Membro</th>
@@ -1049,8 +1049,13 @@ function CategoriesManager({ categories, onReload }) {
 
 const sLabel = { color: '#94a3b8', fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }
 const fld    = { marginBottom: 14 }
-const viewTabBtn = { padding: '9px 14px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }
-const thStyle = { textAlign: 'left', padding: '10px 12px', color: '#666', fontWeight: 600, fontSize: 12 }
-const tdStyle = { padding: '9px 12px', color: '#111' }
+const viewTabBtn = { padding: '8px 10px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap' }
+// Padding più stretto delle celle rispetto al resto dell'app: questa tabella
+// ha 4 colonne fisse (Membro + 3 importi) dentro un contenitore già scrollabile
+// in orizzontale — meno aria per riga significa che il minWidth sotto entra
+// per intero anche su telefoni stretti (~360px), senza dover scrollare per
+// il caso comune di 2-3 membri.
+const thStyle = { textAlign: 'left', padding: '8px 6px', color: '#666', fontWeight: 600, fontSize: 12 }
+const tdStyle = { padding: '7px 6px', color: '#111', fontSize: 12 }
 const lbl    = { display: 'block', fontSize: 13, fontWeight: 500, color: '#444', marginBottom: 5 }
 const inp    = { width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #ccc', fontSize: 14, outline: 'none', backgroundColor: '#f9f9f9', color: '#111', colorScheme: 'light', boxSizing: 'border-box', fontFamily: 'system-ui, -apple-system, sans-serif' }
