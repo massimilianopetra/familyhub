@@ -5,8 +5,8 @@
 // Le scritture restano online-only, non c'è coda di sync qui dentro.
 
 const DB_NAME = 'familyhub-cache'
-const DB_VERSION = 1
-const STORES = ['loyalty_cards', 'calendar_events', 'medicines']
+const DB_VERSION = 2
+const STORES = ['loyalty_cards', 'calendar_events', 'medicines', 'postits']
 
 let dbPromise = null
 

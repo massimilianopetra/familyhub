@@ -5,6 +5,7 @@ import CalendarSection from './CalendarSection'
 import UpcomingEventsSection from './UpcomingEventsSection'
 import LoyaltyCardsSection from './LoyaltyCardsSection'
 import MedicinesSection from './MedicinesSection'
+import PostitSection from './PostitSection'
 import AdminSection from './AdminSection'
 import FamilySection from './FamilySection'
 import PaymentsScreen from './PaymentsScreen'
@@ -15,7 +16,7 @@ import { saveCache } from '../utils/offlineCache'
 // Tabelle cacheate offline (vedi src/utils/offlineCache.js): non "payments",
 // che resta online-only per scelta (dati finanziari, ora condivisi per
 // famiglia come le altre tre ma senza cache offline — mai rivisitato).
-const OFFLINE_TABLES = ['loyalty_cards', 'calendar_events', 'medicines']
+const OFFLINE_TABLES = ['loyalty_cards', 'calendar_events', 'medicines', 'postits']
 
 const SUPER_USER = 'massimiliano.petra@gmail.com'
 
@@ -25,6 +26,7 @@ const NAV_BASE = [
   { id: 'upcoming', icon: '🗓️', label: 'Prossimi' },
   { id: 'cards',    icon: '🎫', label: 'Tessere' },
   { id: 'medicines', icon: '💊', label: 'Medicine' },
+  { id: 'postits',  icon: '📝', label: 'Post-it' },
   { id: 'payments', icon: '💳', label: 'Pagamenti' },
   { id: 'family',   icon: '👪', label: 'Famiglia' },
   { id: 'about',    icon: 'ℹ️', label: 'Info' },
@@ -168,6 +170,7 @@ export default function Dashboard({ session }) {
         {section === 'upcoming' && <UpcomingEventsSection session={session} />}
         {section === 'cards'    && <LoyaltyCardsSection session={session} />}
         {section === 'medicines' && <MedicinesSection session={session} />}
+        {section === 'postits'  && <PostitSection session={session} />}
         {section === 'payments' && <PaymentsScreen user={session.user} />}
         {section === 'family'   && <FamilySection session={session} />}
         {section === 'about'    && <AboutSection />}

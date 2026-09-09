@@ -58,6 +58,14 @@ Portafoglio digitale per le tessere punti/fedeltà dei negozi, con barcode/QR pr
 - **Colore personalizzato** per ogni tessera, con testo automaticamente contrastato (chiaro/scuro) in base alla luminosità dello sfondo.
 - **Filtro "Solo mie"** per nascondere le tessere inserite dagli altri membri della famiglia.
 
+### 📝 Post-it
+
+Bacheca di note/promemoria senza data, condivise in famiglia come le altre sezioni.
+
+- **Editor a tutto schermo** in stile post-it, con scelta del colore (giallo di default, più arancio/rosa/verde/blu/viola).
+- **Limite di 10 post-it a persona**, applicato sia lato interfaccia (pulsante "+ Aggiungi" disabilitato) sia lato database.
+- **Filtro "Solo miei"** e badge **👤 Famiglia** per le note degli altri membri, che restano visualizzabili ma non modificabili.
+
 ### 🎮 Giochi
 
 Raccolta di giochi classici ottimizzati per mobile, con tema dark retro.
@@ -161,6 +169,7 @@ Visibile esclusivamente all'account amministratore. Permette di:
 | `app_settings` | Impostazioni globali dell'app (es. `registration_enabled`) |
 | `payments` | Pagamenti/bollette con `user_id`, titolo, importo, categoria, scadenza, stato pagato, ricorrenza |
 | `loyalty_cards` | Tessere fedeltà con `user_id`, nome negozio, valore e formato barcode, colore |
+| `postits` | Note/promemoria senza data con `user_id`, contenuto, colore (max 10 per persona) |
 | `families` | Famiglie: nome, codice invito, `leader_user_id` |
 | `family_members` | Appartenenza famiglia: `user_id`, `family_id`, `role` (leader/member), `status` (pending/approved) |
 
