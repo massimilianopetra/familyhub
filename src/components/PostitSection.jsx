@@ -95,6 +95,7 @@ function PostitEditor({ postit, readOnly = false, onClose, onSaved, onDeleted })
         width:'100%', maxWidth:'360px', display:'flex', flexDirection:'column', gap:'14px',
         boxShadow:'0 24px 60px rgba(0,0,0,0.6), 0 2px 0 rgba(0,0,0,0.08) inset',
         fontFamily:"'Segoe Print','Comic Sans MS',cursive",
+        maxHeight:'90vh', overflowY:'auto', boxSizing:'border-box',
       }}>
         <div style={{ fontSize:'1.05rem', fontWeight:'700', color:INK_COLOR }}>
           {readOnly ? '📝 Post-it' : isEdit ? '✏️ Modifica post-it' : '📝 Nuovo post-it'}
@@ -108,10 +109,10 @@ function PostitEditor({ postit, readOnly = false, onClose, onSaved, onDeleted })
           onChange={e => { setContent(e.target.value); setError('') }}
           placeholder="Scrivi qui la tua nota o promemoria…"
           rows={7}
+          className="postit-editor-text"
           style={{
             background:'transparent', border:'none', outline:'none', resize:'none',
-            color:INK_COLOR, fontSize:'1.05rem', lineHeight:1.5,
-            fontFamily:'inherit', width:'100%', boxSizing:'border-box',
+            color:INK_COLOR, fontFamily:'inherit', width:'100%', boxSizing:'border-box',
             cursor: readOnly ? 'default' : 'text',
           }}
         />
@@ -191,8 +192,8 @@ function PostitNote({ postit, isOwner, onOpen }) {
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'rotate(0deg) scale(1.03)' }}
       onMouseLeave={e => { e.currentTarget.style.transform = `rotate(${rotate}deg)` }}>
-      <div style={{
-        flex:1, color:INK_COLOR, fontSize:'0.95rem', lineHeight:1.4,
+      <div className="postit-note-text" style={{
+        flex:1, color:INK_COLOR,
         whiteSpace:'pre-wrap', wordBreak:'break-word', overflow:'hidden',
         display:'-webkit-box', WebkitLineClamp:7, WebkitBoxOrient:'vertical',
       }}>
@@ -249,6 +250,15 @@ export default function PostitSection({ session }) {
 
   return (
     <div style={{ width:'100%' }}>
+      <style>{`
+        .postit-grid { display:grid; gap:18px; grid-template-columns:repeat(2,1fr); }
+        @media(min-width:600px){ .postit-grid { grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:22px; } }
+
+        /* Testo grande e in grassetto ovunque: si legge meglio, non solo su cellulare */
+        .postit-note-text { font-size:1.3rem; font-weight:700; line-height:1.35; }
+        .postit-editor-text { font-size:1.45rem; font-weight:700; line-height:1.4; }
+      `}</style>
+
       {/* Header */}
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:'20px', flexWrap:'wrap', gap:'12px' }}>
         <div>
@@ -287,10 +297,6 @@ export default function PostitSection({ session }) {
 
       {!loading && filtered.length > 0 && (
         <>
-          <style>{`
-            .postit-grid { display:grid; gap:18px; grid-template-columns:repeat(2,1fr); }
-            @media(min-width:600px){ .postit-grid { grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:22px; } }
-          `}</style>
           <div className="postit-grid">
             {filtered.map(p => (
               <PostitNote
