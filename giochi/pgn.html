@@ -19,7 +19,15 @@
 
         .top-controls { display: flex; gap: 5px; margin-bottom: 6px; }
         .btn { flex: 1; padding: 7px 4px; border: 2px solid var(--hidden); border-radius: 6px; background: var(--empty); color: var(--muted); font-weight: bold; font-size: 0.72rem; cursor: pointer; }
-        .btn:active { border-color: var(--accent); color: var(--accent); }
+        .btn:active, .btn.on { border-color: var(--accent); color: var(--accent); }
+        .btn.on { background: #1e1c00; }
+
+        .engine { display: flex; align-items: center; gap: 6px; background: var(--empty); border-radius: 5px; padding: 4px 6px 4px 8px; font-size: 0.7rem; color: var(--muted); }
+        .engine[hidden] { display: none; }
+        .engine-line { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .engine-line b { color: var(--text); margin-right: 2px; }
+        .engine button { flex-shrink: 0; padding: 4px 8px; border: 1px solid var(--hidden); border-radius: 5px; background: #3a3d4d; color: var(--text); font-size: 0.68rem; font-weight: bold; cursor: pointer; }
+        .engine .credit { flex-shrink: 0; color: #6b6e80; text-decoration: none; font-size: 0.8rem; }
 
         select { width: 100%; margin-bottom: 5px; padding: 5px; border-radius: 6px; background: var(--empty); color: var(--text); border: 1px solid var(--hidden); font-size: 0.72rem; }
 
@@ -34,7 +42,17 @@
         /* container-type:size abilita cqh: la scacchiera usa esattamente lo
            spazio che resta dopo le fasce fisse. */
         .board-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; container-type: size; }
-        .board { display: grid; grid-template-columns: repeat(8, 1fr); width: min(100cqw, 100cqh); aspect-ratio: 1; border-radius: 4px; overflow: hidden; container-type: inline-size; box-shadow: 0 4px 14px rgba(0,0,0,0.5); touch-action: pan-y; }
+        .board-row { display: flex; gap: 4px; }
+        .board { position: relative; display: grid; grid-template-columns: repeat(8, 1fr); width: min(100cqw, 100cqh); aspect-ratio: 1; border-radius: 4px; overflow: hidden; container-type: inline-size; box-shadow: 0 4px 14px rgba(0,0,0,0.5); touch-action: pan-y; }
+        /* Con l'analisi attiva la barra di valutazione (14px + gap) si prende
+           un pezzo di larghezza: la scacchiera si restringe di conseguenza. */
+        .board-wrap.analysis .board { width: min(calc(100cqw - 18px), 100cqh); }
+        .eval-bar { display: none; width: 14px; flex-shrink: 0; border-radius: 3px; background: #0b0b0b; position: relative; overflow: hidden; }
+        .board-wrap.analysis .eval-bar { display: block; }
+        .eval-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: #f4f4f4; transition: height 0.4s; }
+        .eval-bar.flipped .eval-fill { bottom: auto; top: 0; }
+        .eval-label { position: absolute; left: 0; right: 0; font-size: 7px; font-weight: bold; text-align: center; letter-spacing: -0.3px; }
+        .arrow { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
         .cell { aspect-ratio: 1; position: relative; display: flex; align-items: center; justify-content: center; user-select: none; }
         .cell.light { background: var(--sq-light); }
         .cell.dark { background: var(--sq-dark); }
@@ -71,6 +89,12 @@
         .moves .mv.cur { background: var(--accent); color: #111; font-weight: bold; }
         .moves .mv.has-comment::after { content: '💬'; font-size: 0.6rem; margin-left: 2px; }
         .moves .result { color: var(--accent); font-weight: bold; margin-left: 4px; }
+        .moves .q { font-weight: bold; margin-left: 1px; }
+        .moves .q.inacc { color: #f1c40f; }
+        .moves .q.mistake { color: #f39c12; }
+        .moves .q.blunder { color: #ff5555; }
+        .moves .mv.cur .q { color: #8b0000; }
+        .moves .summary { font-size: 0.68rem; color: var(--muted); border-bottom: 1px solid #2b2d3a; padding-bottom: 3px; margin-bottom: 3px; }
         .moves .empty { color: var(--muted); text-align: center; padding-top: 18px; font-size: 0.72rem; }
 
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
@@ -90,6 +114,7 @@
         <button class="btn" id="btn-file">📂 Carica file</button>
         <button class="btn" id="btn-paste">📋 Incolla</button>
         <button class="btn" id="btn-sample">♟ Esempio</button>
+        <button class="btn" id="btn-engine">🧠 Analisi</button>
     </div>
     <input type="file" id="file-input" accept=".pgn,.txt,application/x-chess-pgn,text/plain" hidden>
     <select id="game-select" hidden></select>
@@ -100,7 +125,12 @@
     </div>
 
     <div class="main">
-        <div class="board-wrap"><div class="board" id="board"></div></div>
+        <div class="board-wrap" id="board-wrap">
+            <div class="board-row">
+                <div class="eval-bar" id="eval-bar"><div class="eval-fill" id="eval-fill"></div><span class="eval-label" id="eval-label"></span></div>
+                <div class="board" id="board"></div>
+            </div>
+        </div>
         <div class="side">
             <div class="nav">
                 <button id="nav-first" title="Inizio">⏮</button>
@@ -109,6 +139,11 @@
                 <button id="nav-next" title="Avanti">▶</button>
                 <button id="nav-last" title="Fine">⏭</button>
                 <button id="nav-flip" title="Gira scacchiera">🔄</button>
+            </div>
+            <div class="engine" id="engine" hidden>
+                <div class="engine-line" id="engine-line"></div>
+                <button id="btn-full">📊 Partita</button>
+                <a class="credit" href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener" title="Motore Stockfish.js 19 — licenza GPLv3, codice sorgente">ⓘ</a>
             </div>
             <div class="message-bar" id="message"></div>
             <div class="moves" id="moves"><div class="empty">Le mosse appariranno qui</div></div>
@@ -376,7 +411,8 @@ function buildGame(raw) {
     let pos;
     try { pos = parseFen(raw.headers.FEN || START_FEN); }
     catch { pos = parseFen(START_FEN); }
-    const game = { headers: raw.headers, positions: [pos], plies: [], intro: '', result: raw.headers.Result || '', error: '' };
+    // evals/best: riempiti da "Analizza partita", un elemento per posizione.
+    const game = { headers: raw.headers, positions: [pos], plies: [], intro: '', result: raw.headers.Result || '', error: '', evals: [], best: [], analyzed: false };
     for (const tk of tokenize(raw.movetext)) {
         if (game.error) break;
         const last = game.plies[game.plies.length - 1];
@@ -406,6 +442,143 @@ function buildGame(raw) {
     return game;
 }
 
+function toFen(pos) {
+    const rows = [];
+    for (let r = 7; r >= 0; r--) {
+        let row = '', empty = 0;
+        for (let f = 0; f < 8; f++) {
+            const p = pos.board[r * 8 + f];
+            if (!p) { empty++; continue; }
+            if (empty) { row += empty; empty = 0; }
+            row += p;
+        }
+        rows.push(row + (empty || ''));
+    }
+    return `${rows.join('/')} ${pos.turn} ${pos.castling || '-'} ${pos.ep >= 0 ? sqName(pos.ep) : '-'} 0 ${pos.fullmove}`;
+}
+
+// Notazione SAN di una mossa legale (serve per mostrare le linee del motore, che parla in "e2e4").
+function toSan(pos, m) {
+    let san;
+    if (m.castle) san = m.castle === 'K' ? 'O-O' : 'O-O-O';
+    else if (m.piece === 'P') san = (m.capture ? FILES[m.from % 8] + 'x' : '') + sqName(m.to) + (m.promo ? '=' + m.promo : '');
+    else {
+        const others = legalMoves(pos).filter(o => o.piece === m.piece && o.to === m.to && o.from !== m.from);
+        let dis = '';
+        if (others.length) {
+            if (!others.some(o => o.from % 8 === m.from % 8)) dis = FILES[m.from % 8];
+            else if (!others.some(o => Math.floor(o.from / 8) === Math.floor(m.from / 8))) dis = String(Math.floor(m.from / 8) + 1);
+            else dis = sqName(m.from);
+        }
+        san = m.piece + dis + (m.capture ? 'x' : '') + sqName(m.to);
+    }
+    const next = applyMove(pos, m);
+    if (inCheck(next)) san += legalMoves(next).length ? '+' : '#';
+    return san;
+}
+
+function uciToMove(pos, uci) {
+    return legalMoves(pos).find(m => sqName(m.from) === uci.slice(0, 2) && sqName(m.to) === uci.slice(2, 4) &&
+        (!m.promo || m.promo === (uci[4] || 'q').toUpperCase())) || null;
+}
+
+const toUci = m => sqName(m.from) + sqName(m.to) + (m.promo ? m.promo.toLowerCase() : '');
+
+// ==========================================
+// 🧠 STOCKFISH (Web Worker, protocollo UCI)
+// ==========================================
+// Una ricerca alla volta: una nuova richiesta ferma quella in corso ("stop")
+// e parte appena il motore risponde "bestmove". Le ricerche interrotte
+// risolvono null.
+const engine = {
+    worker: null, ready: null, job: null, queued: null,
+    start() {
+        if (this.ready) return this.ready;
+        this.ready = new Promise((resolve, reject) => {
+            let w;
+            try { w = new Worker('engine/stockfish-19-lite-single.js'); } catch (e) { reject(e); return; }
+            const fail = () => { clearTimeout(timeout); w.terminate(); reject(new Error('motore non caricato')); };
+            const timeout = setTimeout(fail, 20000);
+            w.onerror = fail;
+            w.onmessage = e => {
+                const line = String(e.data);
+                if (line === 'uciok') w.postMessage('isready');
+                else if (line === 'readyok') {
+                    clearTimeout(timeout);
+                    w.onerror = null;
+                    w.onmessage = ev => this.onLine(String(ev.data));
+                    this.worker = w;
+                    resolve();
+                }
+            };
+            w.postMessage('uci');
+        });
+        this.ready.catch(() => { this.ready = null; });
+        return this.ready;
+    },
+    analyze(fen, depth, onInfo) {
+        return new Promise(resolve => {
+            const job = { fen, depth, onInfo, resolve, last: null, stopping: false };
+            if (!this.job) return this.run(job);
+            if (this.queued) this.queued.resolve(null);
+            this.queued = job;
+            this.halt();
+        });
+    },
+    run(job) {
+        this.job = job;
+        this.worker.postMessage('position fen ' + job.fen);
+        this.worker.postMessage('go depth ' + job.depth);
+    },
+    halt() {
+        if (this.job && !this.job.stopping) { this.job.stopping = true; this.worker.postMessage('stop'); }
+    },
+    stop() {
+        if (this.queued) { this.queued.resolve(null); this.queued = null; }
+        this.halt();
+    },
+    onLine(line) {
+        const job = this.job;
+        if (!job) return;
+        if (line.startsWith('info ') && line.includes(' pv ') && !/(lower|upper)bound/.test(line)) {
+            const m = line.match(/ depth (\d+) .*?score (cp|mate) (-?\d+).*? pv (.+)$/);
+            if (!m) return;
+            job.last = { depth: +m[1], kind: m[2], value: +m[3], pv: m[4].trim().split(/\s+/) };
+            if (!job.stopping && job.onInfo) job.onInfo(job.last);
+        } else if (line.startsWith('bestmove')) {
+            this.job = null;
+            job.resolve(job.stopping ? null : job.last);
+            if (this.queued) { const q = this.queued; this.queued = null; this.run(q); }
+        }
+    },
+};
+
+// Punteggi sempre dal punto di vista del Bianco: { cp } in centesimi di pedone,
+// { mate } = matto in N (positivo: matta il Bianco), { mated } = partita finita col matto.
+function whiteScore(info, turn) {
+    const s = turn === 'w' ? 1 : -1;
+    return info.kind === 'mate' ? { mate: info.value * s } : { cp: info.value * s };
+}
+
+function terminalScore(pos) {
+    if (legalMoves(pos).length) return null;
+    return inCheck(pos) ? { mated: pos.turn } : { cp: 0 };
+}
+
+function scoreText(sc) {
+    if (sc.mated) return sc.mated === 'w' ? '0-1' : '1-0';
+    if (sc.mate !== undefined) return '#' + sc.mate;
+    return (sc.cp > 0 ? '+' : '') + (sc.cp / 100).toFixed(1);
+}
+
+// Probabilità di vittoria del Bianco (0–100), stessa formula usata da Lichess:
+// serve sia per la barra sia per classificare gli errori.
+function winPct(sc) {
+    if (sc.mated) return sc.mated === 'w' ? 0 : 100;
+    if (sc.mate !== undefined) return sc.mate > 0 ? 100 : 0;
+    return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * sc.cp)) - 1);
+}
+
 // ==========================================
 // 🖥️ INTERFACCIA
 // ==========================================
@@ -425,6 +598,10 @@ const SAMPLE_PGN = `[Event "Partita amichevole (l'Immortale)"]
 19. e5 Qxa1+ 20. Ke2 Na6 21. Nxg7+ Kd8 22. Qf6+ Nxf6 23. Be7# {Scacco matto con i soli pezzi minori.} 1-0`;
 
 let games = [], game = null, cur = 0, flipped = false, timer = null;
+// Analisi: liveToken invalida i risultati di ricerche ormai superate (l'utente è già su un'altra mossa).
+let analysisOn = false, bestArrow = null, liveToken = 0, fullRunning = false, fullCancel = false;
+const LIVE_DEPTH = 18, FULL_DEPTH = 12;
+const QSYM = { inacc: '?!', mistake: '?', blunder: '??' };
 const $ = id => document.getElementById(id);
 
 function loadPgn(text, { remember = true } = {}) {
@@ -467,6 +644,7 @@ function goTo(n) {
     } else if (cur === 0) box.scrollTop = 0;
     updateMessage();
     updateNav();
+    if (analysisOn) analyzeCurrent();
 }
 
 function renderBoard() {
@@ -487,7 +665,157 @@ function renderBoard() {
             html += `<div class="${cls.join(' ')}">${inner}</div>`;
         }
     }
+    html += '<svg class="arrow" id="arrow" viewBox="0 0 8 8"></svg>';
     $('board').innerHTML = html;
+    $('eval-bar').classList.toggle('flipped', flipped);
+    drawArrow();
+}
+
+// ==========================================
+// 🧠 ANALISI (barra, mossa migliore, errori)
+// ==========================================
+let lastEval = null;
+
+function setEval(sc) {
+    lastEval = sc;
+    const pct = winPct(sc);
+    $('eval-fill').style.height = pct + '%';
+    const label = $('eval-label'), whiteAhead = pct >= 50;
+    // L'etichetta sta dal lato di chi è in vantaggio (in basso il Bianco, salvo scacchiera girata).
+    const atBottom = whiteAhead !== flipped;
+    label.textContent = scoreText(sc).replace(/^\+/, '');
+    label.style.top = atBottom ? '' : '2px';
+    label.style.bottom = atBottom ? '2px' : '';
+    label.style.color = whiteAhead ? '#333' : '#eee';
+}
+
+function setEngineLine(html) { $('engine-line').innerHTML = html; }
+
+function drawArrow() {
+    const svg = $('arrow');
+    if (!svg) return;
+    if (!analysisOn || !bestArrow) { svg.innerHTML = ''; return; }
+    const center = s => { const f = s % 8, r = Math.floor(s / 8); return [(flipped ? 7 - f : f) + 0.5, (flipped ? r : 7 - r) + 0.5]; };
+    const [x1, y1] = center(bestArrow.from), [x2, y2] = center(bestArrow.to);
+    const len = Math.hypot(x2 - x1, y2 - y1), k = (len - 0.32) / len;
+    const col = 'rgba(21,120,27,0.85)';
+    svg.innerHTML = `<defs><marker id="ah" markerWidth="4" markerHeight="4" refX="1.2" refY="2" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L4,2 L0,4 Z" fill="${col}"/></marker></defs>` +
+        `<line x1="${x1}" y1="${y1}" x2="${x1 + (x2 - x1) * k}" y2="${y1 + (y2 - y1) * k}" stroke="${col}" stroke-width="0.17" stroke-linecap="round" marker-end="url(#ah)"/>`;
+}
+
+// Linea principale del motore in notazione leggibile: "12. ♘f3 e5 13. ♗c4 …"
+function pvText(pos, pv, max = 6) {
+    const out = [];
+    let p = pos;
+    for (const uci of pv.slice(0, max)) {
+        const m = uciToMove(p, uci);
+        if (!m) break;
+        const num = p.turn === 'w' ? p.fullmove + '. ' : (out.length === 0 ? p.fullmove + '... ' : '');
+        out.push(num + figurine(toSan(p, m)));
+        p = applyMove(p, m);
+    }
+    return out.join(' ');
+}
+
+async function analyzeCurrent() {
+    const token = ++liveToken;
+    bestArrow = null;
+    drawArrow();
+    if (!analysisOn || fullRunning) return;
+    if (!game) { setEngineLine('Carica una partita da analizzare'); return; }
+    const g = game, pos = g.positions[cur];
+    const term = terminalScore(pos);
+    if (term) { setEval(term); setEngineLine(`<b>${scoreText(term)}</b> partita finita`); return; }
+    if (g.evals[cur]) setEval(g.evals[cur]);
+    setEngineLine('🧠 Calcolo…');
+    try { await engine.start(); }
+    catch { if (token === liveToken) setEngineLine('⚠️ Impossibile caricare il motore (sei offline?)'); return; }
+    if (token !== liveToken) return;
+    engine.analyze(toFen(pos), LIVE_DEPTH, info => {
+        if (token !== liveToken) return;
+        const sc = whiteScore(info, pos.turn);
+        setEval(sc);
+        const m = uciToMove(pos, info.pv[0]);
+        bestArrow = m && { from: m.from, to: m.to };
+        drawArrow();
+        setEngineLine(`<b>${scoreText(sc)}</b> <span title="profondità">d${info.depth}</span> · ${esc(pvText(pos, info.pv))}`);
+    });
+}
+
+function toggleAnalysis() {
+    analysisOn = !analysisOn;
+    $('btn-engine').classList.toggle('on', analysisOn);
+    $('engine').hidden = !analysisOn;
+    $('board-wrap').classList.toggle('analysis', analysisOn);
+    if (!analysisOn) {
+        liveToken++;
+        fullCancel = true;
+        if (engine.worker) engine.stop();
+        bestArrow = null;
+        drawArrow();
+        return;
+    }
+    setEval({ cp: 0 });
+    analyzeCurrent();
+}
+
+// Valuta tutte le posizioni a profondità ridotta e marca le mosse che fanno
+// perdere probabilità di vittoria: ≥10 punti ?!, ≥20 ?, ≥30 ?? (soglie Lichess).
+async function analyzeGame() {
+    if (fullRunning) { fullCancel = true; engine.stop(); return; }
+    if (!game || !game.plies.length) return;
+    stopPlay();
+    const g = game;
+    liveToken++;
+    bestArrow = null;
+    drawArrow();
+    setEngineLine('🧠 Avvio motore…');
+    try { await engine.start(); }
+    catch { setEngineLine('⚠️ Impossibile caricare il motore (sei offline?)'); return; }
+    fullRunning = true;
+    fullCancel = false;
+    $('btn-full').textContent = '⏹ Stop';
+    engine.stop();
+    const total = g.positions.length;
+    for (let i = 0; i < total; i++) {
+        if (fullCancel || game !== g || !analysisOn) break;
+        setEngineLine(`📊 Analisi partita… ${Math.round(i * 100 / total)}%`);
+        if (g.evals[i] && g.best[i] !== undefined) continue;
+        const pos = g.positions[i];
+        const term = terminalScore(pos);
+        if (term) { g.evals[i] = term; g.best[i] = null; continue; }
+        const info = await engine.analyze(toFen(pos), FULL_DEPTH);
+        if (!info) break;
+        g.evals[i] = whiteScore(info, pos.turn);
+        g.best[i] = info.pv[0];
+    }
+    classifyMoves(g);
+    fullRunning = false;
+    $('btn-full').textContent = '📊 Partita';
+    if (game === g) renderMoves();
+    goTo(cur);
+}
+
+function classifyMoves(g) {
+    let any = false;
+    g.plies.forEach((p, i) => {
+        const before = g.evals[i], after = g.evals[i + 1];
+        if (!before || !after) return;
+        any = true;
+        const drop = p.color === 'w' ? winPct(before) - winPct(after) : winPct(after) - winPct(before);
+        const isBest = g.best[i] === toUci(p.move);
+        p.q = isBest ? '' : drop >= 30 ? 'blunder' : drop >= 20 ? 'mistake' : drop >= 10 ? 'inacc' : '';
+    });
+    g.analyzed = any;
+}
+
+function analysisSummary(g) {
+    const count = color => {
+        const c = { inacc: 0, mistake: 0, blunder: 0 };
+        g.plies.forEach(p => { if (p.color === color && p.q) c[p.q]++; });
+        return `${c.blunder}<span class="q blunder">??</span> ${c.mistake}<span class="q mistake">?</span> ${c.inacc}<span class="q inacc">?!</span>`;
+    };
+    return `<div class="summary">Analisi: ⚪ ${count('w')} &nbsp;·&nbsp; ⚫ ${count('b')}</div>`;
 }
 
 function figurine(san) {
@@ -500,11 +828,12 @@ function renderMoves() {
         box.innerHTML = `<div class="empty">${game.error ? esc(game.error) : 'Nessuna mossa in questa partita'}</div>`;
         return;
     }
-    let html = '';
+    let html = game.analyzed ? analysisSummary(game) : '';
     game.plies.forEach((p, i) => {
         if (p.color === 'w') html += `<span class="num">${p.num}.</span>`;
         else if (i === 0) html += `<span class="num">${p.num}...</span>`;
-        html += `<span class="mv${p.comment ? ' has-comment' : ''}" data-i="${i + 1}">${esc(figurine(p.san))}</span> `;
+        const q = p.q ? `<span class="q ${p.q}">${QSYM[p.q]}</span>` : '';
+        html += `<span class="mv${p.comment ? ' has-comment' : ''}" data-i="${i + 1}">${esc(figurine(p.san))}${q}</span> `;
     });
     if (game.result && game.result !== '*') html += `<span class="result">${esc(game.result)}</span>`;
     box.innerHTML = html;
@@ -591,8 +920,10 @@ $('nav-prev').onclick = () => { stopPlay(); goTo(cur - 1); };
 $('nav-next').onclick = () => { stopPlay(); goTo(cur + 1); };
 $('nav-last').onclick = () => { stopPlay(); goTo(game.plies.length); };
 $('nav-play').onclick = togglePlay;
-$('nav-flip').onclick = () => { flipped = !flipped; renderBoard(); };
-$('moves').onclick = e => { const i = e.target.dataset && e.target.dataset.i; if (i) { stopPlay(); goTo(+i); } };
+$('nav-flip').onclick = () => { flipped = !flipped; renderBoard(); if (lastEval) setEval(lastEval); };
+$('btn-engine').onclick = toggleAnalysis;
+$('btn-full').onclick = analyzeGame;
+$('moves').onclick = e => { const mv = e.target.closest('.mv'); if (mv) { stopPlay(); goTo(+mv.dataset.i); } };
 
 document.addEventListener('keydown', e => {
     if (!game || $('paste-modal').classList.contains('active')) return;
