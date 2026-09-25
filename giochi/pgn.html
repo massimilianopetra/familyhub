@@ -60,9 +60,8 @@
         .cell.last.dark { background: #dcc34b; }
         .cell.check { background: radial-gradient(circle, #ff3b3b 0%, #e02020 35%, rgba(224,32,32,0) 75%), var(--sq-dark); }
         .cell.check.light { background: radial-gradient(circle, #ff3b3b 0%, #e02020 35%, rgba(224,32,32,0) 75%), var(--sq-light); }
-        .piece { font-size: 10.5cqw; line-height: 1; font-family: "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols 2", sans-serif; }
-        .piece.w { color: #fff; text-shadow: 0 0 1px #000, 0 0 1px #000, 0 0 2px #000, 0 2px 3px rgba(0,0,0,0.5); }
-        .piece.b { color: #1a1a1a; text-shadow: 0 0 1px #fff8, 0 2px 3px rgba(0,0,0,0.4); }
+        /* Pezzi SVG "cburnett" (pieces/cburnett): identici su ogni sistema, a differenza dei caratteri ♚♛… che dipendono dal font. */
+        .piece { width: 100%; height: 100%; display: block; pointer-events: none; user-select: none; -webkit-user-drag: none; }
         .coord { position: absolute; font-size: 2.6cqw; font-weight: bold; line-height: 1; }
         .coord.rank { top: 2px; left: 2px; }
         .coord.file { bottom: 2px; right: 3px; }
@@ -582,7 +581,7 @@ function winPct(sc) {
 // ==========================================
 // 🖥️ INTERFACCIA
 // ==========================================
-const GLYPH = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟' };
+const PIECE_DIR = 'pieces/cburnett/';
 const FIGURINE = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘' };
 const STORAGE_KEY = 'familyhub.pgnviewer.last';
 const SAMPLE_PGN = `[Event "Partita amichevole (l'Immortale)"]
@@ -659,7 +658,7 @@ function renderBoard() {
             if (last && (s === last.from || s === last.to)) cls.push('last');
             if (s === checkSq) cls.push('check');
             const p = pos.board[s];
-            let inner = p ? `<span class="piece ${colorOf(p)}">${GLYPH[p.toUpperCase()]}&#xFE0E;</span>` : '';
+            let inner = p ? `<img class="piece" src="${PIECE_DIR}${colorOf(p)}${p.toUpperCase()}.svg" alt="${p}" draggable="false">` : '';
             if (col === 0) inner += `<span class="coord rank">${r + 1}</span>`;
             if (row === 7) inner += `<span class="coord file">${FILES[f]}</span>`;
             html += `<div class="${cls.join(' ')}">${inner}</div>`;
