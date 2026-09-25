@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Scacchi PGN</title>
+    <style>
+        :root {
+            --bg: #1e1e24; --panel: #2a2b36; --text: #f4f4f6; --empty: #111217;
+            --hidden: #44475a; --muted: #a0a2b1; --accent: #f1c40f;
+            --sq-light: #f0d9b5; --sq-dark: #b58863;
+        }
+        * { box-sizing: border-box; }
+        /* height (non min-height) + overflow:hidden: qui vh è l'altezza reale
+           dell'iframe — il contenuto deve stare esattamente dentro. */
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 8px; display: flex; flex-direction: column; align-items: center; height: 100vh; overflow: hidden; }
+        .game-container { background: var(--panel); padding: 8px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); width: 100%; max-width: 420px; display: flex; flex-direction: column; min-height: 0; flex: 1; }
+        @media (min-width: 760px) { .game-container { max-width: 900px; } }
+
+        .top-controls { display: flex; gap: 5px; margin-bottom: 6px; }
+        .btn { flex: 1; padding: 7px 4px; border: 2px solid var(--hidden); border-radius: 6px; background: var(--empty); color: var(--muted); font-weight: bold; font-size: 0.72rem; cursor: pointer; }
+        .btn:active { border-color: var(--accent); color: var(--accent); }
+
+        select { width: 100%; margin-bottom: 5px; padding: 5px; border-radius: 6px; background: var(--empty); color: var(--text); border: 1px solid var(--hidden); font-size: 0.72rem; }
+
+        .info { background: var(--empty); border-radius: 6px; padding: 5px 8px; margin-bottom: 5px; font-size: 0.74rem; text-align: center; }
+        .info .players { font-weight: bold; }
+        .info .meta { color: var(--muted); font-size: 0.65rem; margin-top: 2px; }
+
+        /* Su schermi larghi scacchiera e lista mosse affiancate. */
+        .main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+        @media (min-width: 760px) { .main { flex-direction: row; } }
+
+        /* container-type:size abilita cqh: la scacchiera usa esattamente lo
+           spazio che resta dopo le fasce fisse. */
+        .board-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; container-type: size; }
+        .board { display: grid; grid-template-columns: repeat(8, 1fr); width: min(100cqw, 100cqh); aspect-ratio: 1; border-radius: 4px; overflow: hidden; container-type: inline-size; box-shadow: 0 4px 14px rgba(0,0,0,0.5); touch-action: pan-y; }
+        .cell { aspect-ratio: 1; position: relative; display: flex; align-items: center; justify-content: center; user-select: none; }
+        .cell.light { background: var(--sq-light); }
+        .cell.dark { background: var(--sq-dark); }
+        .cell.last.light { background: #f6eb72; }
+        .cell.last.dark { background: #dcc34b; }
+        .cell.check { background: radial-gradient(circle, #ff3b3b 0%, #e02020 35%, rgba(224,32,32,0) 75%), var(--sq-dark); }
+        .cell.check.light { background: radial-gradient(circle, #ff3b3b 0%, #e02020 35%, rgba(224,32,32,0) 75%), var(--sq-light); }
+        .piece { font-size: 10.5cqw; line-height: 1; font-family: "Segoe UI Symbol", "DejaVu Sans", "Noto Sans Symbols 2", sans-serif; }
+        .piece.w { color: #fff; text-shadow: 0 0 1px #000, 0 0 1px #000, 0 0 2px #000, 0 2px 3px rgba(0,0,0,0.5); }
+        .piece.b { color: #1a1a1a; text-shadow: 0 0 1px #fff8, 0 2px 3px rgba(0,0,0,0.4); }
+        .coord { position: absolute; font-size: 2.6cqw; font-weight: bold; line-height: 1; }
+        .coord.rank { top: 2px; left: 2px; }
+        .coord.file { bottom: 2px; right: 3px; }
+        .cell.light .coord { color: var(--sq-dark); }
+        .cell.dark .coord { color: var(--sq-light); }
+
+        .side { display: flex; flex-direction: column; min-height: 0; gap: 5px; flex-shrink: 0; }
+        @media (min-width: 760px) { .side { width: 280px; } }
+
+        .nav { display: flex; gap: 5px; }
+        .nav button { flex: 1; padding: 9px 0; border: none; border-radius: 6px; background: #3a3d4d; color: var(--text); font-size: 1rem; cursor: pointer; }
+        .nav button:disabled { opacity: 0.35; cursor: default; }
+        .nav button.on { background: var(--accent); color: #111; }
+
+        .message-bar { background: var(--empty); border-radius: 5px; padding: 5px 8px; font-size: 0.7rem; color: var(--muted); text-align: center; min-height: 26px; display: flex; align-items: center; justify-content: center; }
+        .message-bar.comment { color: #cfe8ff; font-style: italic; }
+        .message-bar.highlight { color: var(--accent); font-weight: bold; }
+        .message-bar.warn { color: #ff5555; font-weight: bold; }
+
+        .moves { background: var(--empty); border-radius: 6px; padding: 6px; overflow-y: auto; font-size: 0.8rem; line-height: 1.7; height: 92px; }
+        @media (min-width: 760px) { .moves { height: auto; flex: 1; } }
+        .moves .num { color: #6b6e80; margin-right: 3px; }
+        .moves .mv { padding: 1px 4px; border-radius: 4px; cursor: pointer; margin-right: 3px; white-space: nowrap; }
+        .moves .mv.cur { background: var(--accent); color: #111; font-weight: bold; }
+        .moves .mv.has-comment::after { content: '💬'; font-size: 0.6rem; margin-left: 2px; }
+        .moves .result { color: var(--accent); font-weight: bold; margin-left: 4px; }
+        .moves .empty { color: var(--muted); text-align: center; padding-top: 18px; font-size: 0.72rem; }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: #2a2b36; border: 1px solid #44475a; border-radius: 14px; padding: 16px; max-width: 420px; width: 92%; box-shadow: 0 24px 60px rgba(0,0,0,0.85); }
+        .modal-box h3 { margin: 0 0 8px; font-size: 1rem; }
+        .modal-box textarea { width: 100%; height: 180px; background: var(--empty); color: var(--text); border: 1px solid var(--hidden); border-radius: 6px; padding: 6px; font-family: monospace; font-size: 0.72rem; resize: vertical; }
+        .modal-actions { display: flex; gap: 6px; margin-top: 8px; }
+        .modal-actions button { flex: 1; padding: 9px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        #paste-ok { background: #38bdf8; color: #0f172a; }
+        #paste-cancel { background: #3a3d4d; color: var(--text); }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div class="top-controls">
+        <button class="btn" id="btn-file">📂 Carica file</button>
+        <button class="btn" id="btn-paste">📋 Incolla</button>
+        <button class="btn" id="btn-sample">♟ Esempio</button>
+    </div>
+    <input type="file" id="file-input" accept=".pgn,.txt,application/x-chess-pgn,text/plain" hidden>
+    <select id="game-select" hidden></select>
+
+    <div class="info">
+        <div class="players" id="info-players">Nessuna partita caricata</div>
+        <div class="meta" id="info-meta">Carica un file .pgn o incolla il testo della partita</div>
+    </div>
+
+    <div class="main">
+        <div class="board-wrap"><div class="board" id="board"></div></div>
+        <div class="side">
+            <div class="nav">
+                <button id="nav-first" title="Inizio">⏮</button>
+                <button id="nav-prev" title="Indietro">◀</button>
+                <button id="nav-play" title="Riproduci">▶▶</button>
+                <button id="nav-next" title="Avanti">▶</button>
+                <button id="nav-last" title="Fine">⏭</button>
+                <button id="nav-flip" title="Gira scacchiera">🔄</button>
+            </div>
+            <div class="message-bar" id="message"></div>
+            <div class="moves" id="moves"><div class="empty">Le mosse appariranno qui</div></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="paste-modal">
+    <div class="modal-box">
+        <h3>📋 Incolla PGN</h3>
+        <textarea id="paste-text" placeholder='[White "..."]&#10;[Black "..."]&#10;&#10;1. e4 e5 2. Nf3 ...'></textarea>
+        <div class="modal-actions">
+            <button id="paste-cancel">Annulla</button>
+            <button id="paste-ok">Carica</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==========================================
+// ♟ MOTORE: posizione, mosse legali, SAN
+// ==========================================
+const FILES = 'abcdefgh';
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+const sqName = s => FILES[s % 8] + (Math.floor(s / 8) + 1);
+const sqIndex = n => (n.charCodeAt(1) - 49) * 8 + (n.charCodeAt(0) - 97);
+const colorOf = p => (p === p.toUpperCase() ? 'w' : 'b');
+
+function parseFen(fen) {
+    const parts = fen.trim().split(/\s+/);
+    const board = new Array(64).fill(null);
+    const rows = parts[0].split('/');
+    if (rows.length !== 8) throw new Error('FEN non valida');
+    for (let i = 0; i < 8; i++) {
+        let f = 0;
+        for (const ch of rows[i]) {
+            if (/\d/.test(ch)) f += +ch;
+            else board[(7 - i) * 8 + f++] = ch;
+        }
+    }
+    return {
+        board,
+        turn: parts[1] === 'b' ? 'b' : 'w',
+        castling: parts[2] && parts[2] !== '-' ? parts[2] : '',
+        ep: parts[3] && parts[3] !== '-' ? sqIndex(parts[3]) : -1,
+        fullmove: +(parts[5] || 1),
+    };
+}
+
+function pieceAt(pos, f, r) {
+    if (f < 0 || f > 7 || r < 0 || r > 7) return undefined;
+    return pos.board[r * 8 + f];
+}
+
+const KNIGHT = [[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]];
+const KING = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+const ROOK_DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+const BISHOP_DIRS = [[1,1],[1,-1],[-1,1],[-1,-1]];
+
+function isAttacked(pos, s, by) {
+    const f = s % 8, r = Math.floor(s / 8);
+    const own = p => p && colorOf(p) === by;
+    const is = (p, t) => own(p) && p.toUpperCase() === t;
+    const pr = by === 'w' ? r - 1 : r + 1;
+    if (is(pieceAt(pos, f - 1, pr), 'P') || is(pieceAt(pos, f + 1, pr), 'P')) return true;
+    for (const [df, dr] of KNIGHT) if (is(pieceAt(pos, f + df, r + dr), 'N')) return true;
+    for (const [df, dr] of KING) if (is(pieceAt(pos, f + df, r + dr), 'K')) return true;
+    const slide = (dirs, types) => dirs.some(([df, dr]) => {
+        for (let k = 1; ; k++) {
+            const p = pieceAt(pos, f + df * k, r + dr * k);
+            if (p === undefined) return false;
+            if (p) return own(p) && types.includes(p.toUpperCase());
+        }
+    });
+    return slide(ROOK_DIRS, 'RQ') || slide(BISHOP_DIRS, 'BQ');
+}
+
+function kingSquare(pos, color) {
+    return pos.board.findIndex(p => p === (color === 'w' ? 'K' : 'k'));
+}
+
+function inCheck(pos) {
+    const k = kingSquare(pos, pos.turn);
+    return k >= 0 && isAttacked(pos, k, pos.turn === 'w' ? 'b' : 'w');
+}
+
+function pseudoMoves(pos) {
+    const moves = [], me = pos.turn, opp = me === 'w' ? 'b' : 'w';
+    const enemy = p => p && colorOf(p) === opp;
+    for (let s = 0; s < 64; s++) {
+        const p = pos.board[s];
+        if (!p || colorOf(p) !== me) continue;
+        const t = p.toUpperCase(), f = s % 8, r = Math.floor(s / 8);
+        const add = (to, extra = {}) => moves.push({ from: s, to, piece: t, ...extra });
+        if (t === 'P') {
+            const dir = me === 'w' ? 1 : -1, startR = me === 'w' ? 1 : 6, lastR = me === 'w' ? 7 : 0;
+            const pushPawn = (to, extra = {}) => {
+                if (Math.floor(to / 8) === lastR) for (const pr of 'QRBN') add(to, { ...extra, promo: pr });
+                else add(to, extra);
+            };
+            if (pieceAt(pos, f, r + dir) === null) {
+                pushPawn((r + dir) * 8 + f);
+                if (r === startR && pieceAt(pos, f, r + 2 * dir) === null) add((r + 2 * dir) * 8 + f, { double: true });
+            }
+            for (const df of [-1, 1]) {
+                const q = pieceAt(pos, f + df, r + dir);
+                if (q === undefined) continue;
+                const to = (r + dir) * 8 + f + df;
+                if (enemy(q)) pushPawn(to, { capture: true });
+                else if (to === pos.ep) add(to, { capture: true, ep: true });
+            }
+        } else if (t === 'N' || t === 'K') {
+            for (const [df, dr] of (t === 'N' ? KNIGHT : KING)) {
+                const q = pieceAt(pos, f + df, r + dr);
+                if (q === null) add((r + dr) * 8 + f + df);
+                else if (enemy(q)) add((r + dr) * 8 + f + df, { capture: true });
+            }
+        } else {
+            const dirs = t === 'R' ? ROOK_DIRS : t === 'B' ? BISHOP_DIRS : ROOK_DIRS.concat(BISHOP_DIRS);
+            for (const [df, dr] of dirs) {
+                for (let k = 1; ; k++) {
+                    const q = pieceAt(pos, f + df * k, r + dr * k);
+                    if (q === undefined) break;
+                    const to = (r + dr * k) * 8 + f + df * k;
+                    if (q === null) { add(to); continue; }
+                    if (enemy(q)) add(to, { capture: true });
+                    break;
+                }
+            }
+        }
+    }
+    // Arrocco: re e torre al loro posto, caselle libere, re non attraversa caselle attaccate.
+    const home = me === 'w' ? 0 : 56, kc = me === 'w' ? 'K' : 'k', rc = me === 'w' ? 'R' : 'r';
+    if (pos.board[home + 4] === kc) {
+        const free = sqs => sqs.every(x => pos.board[home + x] === null);
+        const safe = sqs => sqs.every(x => !isAttacked(pos, home + x, opp));
+        if (pos.castling.includes(me === 'w' ? 'K' : 'k') && pos.board[home + 7] === rc && free([5, 6]) && safe([4, 5, 6]))
+            moves.push({ from: home + 4, to: home + 6, piece: 'K', castle: 'K' });
+        if (pos.castling.includes(me === 'w' ? 'Q' : 'q') && pos.board[home] === rc && free([1, 2, 3]) && safe([4, 3, 2]))
+            moves.push({ from: home + 4, to: home + 2, piece: 'K', castle: 'Q' });
+    }
+    return moves;
+}
+
+function applyMove(pos, m) {
+    const b = pos.board.slice(), me = pos.turn;
+    const p = b[m.from];
+    b[m.to] = m.promo ? (me === 'w' ? m.promo : m.promo.toLowerCase()) : p;
+    b[m.from] = null;
+    if (m.ep) b[Math.floor(m.from / 8) * 8 + (m.to % 8)] = null;
+    if (m.castle) {
+        const home = me === 'w' ? 0 : 56;
+        const [rf, rt] = m.castle === 'K' ? [7, 5] : [0, 3];
+        b[home + rt] = b[home + rf];
+        b[home + rf] = null;
+    }
+    let castling = pos.castling;
+    if (m.piece === 'K') castling = castling.replace(me === 'w' ? /[KQ]/g : /[kq]/g, '');
+    const lose = { 0: 'Q', 7: 'K', 56: 'q', 63: 'k' };
+    for (const s of [m.from, m.to]) if (lose[s]) castling = castling.replace(lose[s], '');
+    return {
+        board: b,
+        turn: me === 'w' ? 'b' : 'w',
+        castling,
+        ep: m.double ? (m.from + m.to) / 2 : -1,
+        fullmove: pos.fullmove + (me === 'b' ? 1 : 0),
+    };
+}
+
+function legalMoves(pos) {
+    return pseudoMoves(pos).filter(m => {
+        const next = applyMove(pos, m);
+        const k = kingSquare(next, pos.turn);
+        return k < 0 || !isAttacked(next, k, next.turn);
+    });
+}
+
+// Traduce una mossa SAN ("Nbd7", "exd6", "O-O", "e8=Q", anche "e2-e4") nella mossa legale corrispondente.
+function resolveSan(pos, san) {
+    const clean = san.replace(/[+#]+$/, '').replace(/e\.p\.$/, '');
+    const legal = legalMoves(pos);
+    const castle = /^[O0]-[O0]-[O0]$/.test(clean) ? 'Q' : /^[O0]-[O0]$/.test(clean) ? 'K' : null;
+    if (castle) return legal.find(m => m.castle === castle) || null;
+    const mm = clean.match(/^([NBRQK])?([a-h])?([1-8])?[x:-]?([a-h][1-8])(?:=?\(?([NBRQ])\)?)?$/);
+    if (!mm) return null;
+    const [, piece = 'P', ff, fr, to, promo] = mm;
+    let cands = legal.filter(m =>
+        m.piece === piece && !m.castle && m.to === sqIndex(to) &&
+        (!ff || FILES[m.from % 8] === ff) && (!fr || String(Math.floor(m.from / 8) + 1) === fr) &&
+        (!m.promo || !promo || m.promo === promo));
+    if (cands.length > 1 && cands.some(m => m.promo)) cands = cands.filter(m => m.promo === (promo || 'Q'));
+    return cands.length === 1 ? cands[0] : null;
+}
+
+// ==========================================
+// 📜 PARSER PGN (più partite, commenti, varianti ignorate)
+// ==========================================
+const NAG = { 1: '!', 2: '?', 3: '!!', 4: '??', 5: '!?', 6: '?!' };
+const RESULTS = ['1-0', '0-1', '1/2-1/2', '½-½', '*'];
+
+function splitGames(text) {
+    const games = [];
+    let cur = { headers: {}, movetext: '' };
+    for (const line of text.replace(/\r/g, '').split('\n')) {
+        if (line.startsWith('%')) continue;
+        const tag = line.match(/^\s*\[(\w+)\s+"((?:[^"\\]|\\.)*)"\s*\]\s*$/);
+        if (tag) {
+            if (cur.movetext.trim()) { games.push(cur); cur = { headers: {}, movetext: '' }; }
+            cur.headers[tag[1]] = tag[2].replace(/\\(.)/g, '$1');
+        } else {
+            cur.movetext += line + '\n';
+        }
+    }
+    if (cur.movetext.trim() || Object.keys(cur.headers).length) games.push(cur);
+    return games;
+}
+
+function tokenize(movetext) {
+    const tokens = [];
+    let i = 0;
+    const n = movetext.length;
+    while (i < n) {
+        const c = movetext[i];
+        if (/\s/.test(c)) { i++; continue; }
+        if (c === '{') {
+            const end = movetext.indexOf('}', i);
+            const stop = end < 0 ? n : end;
+            tokens.push({ type: 'comment', text: movetext.slice(i + 1, stop).replace(/\[%[^\]]*\]/g, '').replace(/\s+/g, ' ').trim() });
+            i = stop + 1;
+        } else if (c === ';') {
+            const end = movetext.indexOf('\n', i);
+            const stop = end < 0 ? n : end;
+            tokens.push({ type: 'comment', text: movetext.slice(i + 1, stop).trim() });
+            i = stop + 1;
+        } else if (c === '(') {
+            // Variante: la saltiamo tutta, compresi eventuali commenti e sotto-varianti.
+            let depth = 0;
+            while (i < n) {
+                const d = movetext[i];
+                if (d === '{') { const e = movetext.indexOf('}', i); i = e < 0 ? n : e + 1; continue; }
+                if (d === '(') depth++;
+                else if (d === ')' && --depth === 0) { i++; break; }
+                i++;
+            }
+        } else if (c === ')') {
+            i++;
+        } else if (c === '$') {
+            const m = movetext.slice(i).match(/^\$(\d+)/);
+            if (m) { tokens.push({ type: 'nag', text: NAG[m[1]] || '' }); i += m[0].length; } else i++;
+        } else {
+            let j = i;
+            while (j < n && !/[\s{}();]/.test(movetext[j])) j++;
+            let word = movetext.slice(i, j);
+            i = j;
+            word = word.replace(/^\d+\.+/, '');
+            if (!word || /^\.+$/.test(word) || word === 'e.p.') continue;
+            if (RESULTS.includes(word)) tokens.push({ type: 'result', text: word });
+            else tokens.push({ type: 'move', text: word });
+        }
+    }
+    return tokens;
+}
+
+function buildGame(raw) {
+    let pos;
+    try { pos = parseFen(raw.headers.FEN || START_FEN); }
+    catch { pos = parseFen(START_FEN); }
+    const game = { headers: raw.headers, positions: [pos], plies: [], intro: '', result: raw.headers.Result || '', error: '' };
+    for (const tk of tokenize(raw.movetext)) {
+        if (game.error) break;
+        const last = game.plies[game.plies.length - 1];
+        if (tk.type === 'comment') {
+            if (!tk.text) continue;
+            if (last) last.comment = (last.comment ? last.comment + ' ' : '') + tk.text;
+            else game.intro = (game.intro ? game.intro + ' ' : '') + tk.text;
+        } else if (tk.type === 'nag') {
+            if (last && tk.text && !/[!?]$/.test(last.san)) last.san += tk.text;
+        } else if (tk.type === 'result') {
+            game.result = tk.text;
+        } else {
+            const annot = (tk.text.match(/[!?]+$/) || [''])[0];
+            const san = tk.text.slice(0, tk.text.length - annot.length);
+            const cur = game.positions[game.positions.length - 1];
+            const m = resolveSan(cur, san);
+            if (!m) {
+                const num = cur.fullmove + (cur.turn === 'w' ? '.' : '...');
+                game.error = `Mossa non valida: ${num} ${tk.text}`;
+                break;
+            }
+            const next = applyMove(cur, m);
+            game.positions.push(next);
+            game.plies.push({ san: san + annot, move: m, comment: '', num: cur.fullmove, color: cur.turn });
+        }
+    }
+    return game;
+}
+
+// ==========================================
+// 🖥️ INTERFACCIA
+// ==========================================
+const GLYPH = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟' };
+const FIGURINE = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘' };
+const STORAGE_KEY = 'familyhub.pgnviewer.last';
+const SAMPLE_PGN = `[Event "Partita amichevole (l'Immortale)"]
+[Site "Londra"]
+[Date "1851.06.21"]
+[White "Adolf Anderssen"]
+[Black "Lionel Kieseritzky"]
+[Result "1-0"]
+
+1. e4 e5 2. f4 exf4 3. Bc4 Qh4+ 4. Kf1 b5 5. Bxb5 Nf6 6. Nf3 Qh6 7. d3 Nh5
+8. Nh4 Qg5 9. Nf5 c6 10. g4 Nf6 11. Rg1 cxb5 12. h4 Qg6 13. h5 Qg5 14. Qf3 Ng8
+15. Bxf4 Qf6 16. Nc3 Bc5 17. Nd5 Qxb2 18. Bd6 {Il Bianco sacrifica entrambe le torri!} Bxg1
+19. e5 Qxa1+ 20. Ke2 Na6 21. Nxg7+ Kd8 22. Qf6+ Nxf6 23. Be7# {Scacco matto con i soli pezzi minori.} 1-0`;
+
+let games = [], game = null, cur = 0, flipped = false, timer = null;
+const $ = id => document.getElementById(id);
+
+function loadPgn(text, { remember = true } = {}) {
+    stopPlay();
+    const raw = splitGames(text).filter(g => g.movetext.trim() || g.headers.FEN);
+    if (!raw.length) { setMessage('Nessuna partita trovata nel testo', 'warn'); return; }
+    games = raw.map(buildGame);
+    if (remember) { try { localStorage.setItem(STORAGE_KEY, text); } catch { /* storage non disponibile */ } }
+    const sel = $('game-select');
+    sel.hidden = games.length < 2;
+    sel.innerHTML = games.map((g, i) =>
+        `<option value="${i}">${i + 1}. ${esc(g.headers.White || '?')} – ${esc(g.headers.Black || '?')}${g.result ? ' (' + esc(g.result) + ')' : ''}</option>`).join('');
+    selectGame(0);
+}
+
+function selectGame(i) {
+    stopPlay();
+    game = games[i];
+    $('game-select').value = i;
+    const h = game.headers;
+    const elo = e => (e && e !== '?' ? ` (${e})` : '');
+    $('info-players').textContent = `⚪ ${h.White || '?'}${elo(h.WhiteElo)}  –  ⚫ ${h.Black || '?'}${elo(h.BlackElo)}`;
+    const meta = [h.Event, h.Site, h.Date && h.Date.replace(/\.\?\?/g, ''), h.Round && h.Round !== '-' ? 'Turno ' + h.Round : '', game.result]
+        .filter(x => x && x !== '?');
+    $('info-meta').textContent = meta.join(' · ') || '—';
+    renderMoves();
+    goTo(0);
+}
+
+function goTo(n) {
+    if (!game) return;
+    cur = Math.max(0, Math.min(n, game.plies.length));
+    renderBoard();
+    document.querySelectorAll('.mv').forEach(el => el.classList.toggle('cur', +el.dataset.i === cur));
+    const el = document.querySelector('.mv.cur');
+    const box = $('moves');
+    if (el) {
+        const top = el.offsetTop - box.offsetTop;
+        if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 24) box.scrollTop = top - box.clientHeight / 2;
+    } else if (cur === 0) box.scrollTop = 0;
+    updateMessage();
+    updateNav();
+}
+
+function renderBoard() {
+    const pos = game ? game.positions[cur] : parseFen(START_FEN);
+    const last = game && cur > 0 ? game.plies[cur - 1].move : null;
+    const checkSq = inCheck(pos) ? kingSquare(pos, pos.turn) : -1;
+    let html = '';
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const r = flipped ? row : 7 - row, f = flipped ? 7 - col : col, s = r * 8 + f;
+            const cls = ['cell', (r + f) % 2 ? 'light' : 'dark'];
+            if (last && (s === last.from || s === last.to)) cls.push('last');
+            if (s === checkSq) cls.push('check');
+            const p = pos.board[s];
+            let inner = p ? `<span class="piece ${colorOf(p)}">${GLYPH[p.toUpperCase()]}&#xFE0E;</span>` : '';
+            if (col === 0) inner += `<span class="coord rank">${r + 1}</span>`;
+            if (row === 7) inner += `<span class="coord file">${FILES[f]}</span>`;
+            html += `<div class="${cls.join(' ')}">${inner}</div>`;
+        }
+    }
+    $('board').innerHTML = html;
+}
+
+function figurine(san) {
+    return san.replace(/^[KQRBN]/, c => FIGURINE[c]).replace(/=([QRBN])/, (_, c) => '=' + FIGURINE[c]);
+}
+
+function renderMoves() {
+    const box = $('moves');
+    if (!game.plies.length) {
+        box.innerHTML = `<div class="empty">${game.error ? esc(game.error) : 'Nessuna mossa in questa partita'}</div>`;
+        return;
+    }
+    let html = '';
+    game.plies.forEach((p, i) => {
+        if (p.color === 'w') html += `<span class="num">${p.num}.</span>`;
+        else if (i === 0) html += `<span class="num">${p.num}...</span>`;
+        html += `<span class="mv${p.comment ? ' has-comment' : ''}" data-i="${i + 1}">${esc(figurine(p.san))}</span> `;
+    });
+    if (game.result && game.result !== '*') html += `<span class="result">${esc(game.result)}</span>`;
+    box.innerHTML = html;
+}
+
+function updateMessage() {
+    if (!game) return;
+    const pos = game.positions[cur];
+    const atEnd = cur === game.plies.length;
+    const ply = cur > 0 ? game.plies[cur - 1] : null;
+    if (ply && ply.comment) return setMessage(ply.comment, 'comment');
+    if (cur === 0 && game.intro) return setMessage(game.intro, 'comment');
+    if (atEnd && game.error) return setMessage(game.error + ' — partita interrotta qui', 'warn');
+    const noMoves = legalMoves(pos).length === 0;
+    if (noMoves && inCheck(pos)) return setMessage(`Scacco matto! Vince il ${pos.turn === 'w' ? 'Nero' : 'Bianco'}`, 'highlight');
+    if (noMoves) return setMessage('Stallo — patta', 'highlight');
+    if (atEnd && game.result && game.result !== '*') {
+        const txt = { '1-0': 'Vince il Bianco', '0-1': 'Vince il Nero', '1/2-1/2': 'Patta', '½-½': 'Patta' }[game.result];
+        return setMessage(`Fine partita: ${game.result}${txt ? ' — ' + txt : ''}`, 'highlight');
+    }
+    if (inCheck(pos)) return setMessage('Scacco!', 'highlight');
+    setMessage(cur === 0 ? 'Posizione iniziale — premi ▶ per avanzare' : `Mossa ${cur} di ${game.plies.length} · tocca al ${pos.turn === 'w' ? 'Bianco' : 'Nero'}`);
+}
+
+function setMessage(text, kind = '') {
+    const el = $('message');
+    el.textContent = text;
+    el.className = 'message-bar' + (kind ? ' ' + kind : '');
+}
+
+function updateNav() {
+    const n = game ? game.plies.length : 0;
+    $('nav-first').disabled = $('nav-prev').disabled = !game || cur === 0;
+    $('nav-last').disabled = $('nav-next').disabled = !game || cur === n;
+    $('nav-play').disabled = !game || n === 0;
+}
+
+function togglePlay() {
+    if (timer) return stopPlay();
+    if (!game) return;
+    if (cur === game.plies.length) goTo(0);
+    $('nav-play').classList.add('on');
+    $('nav-play').textContent = '⏸';
+    timer = setInterval(() => {
+        if (cur >= game.plies.length) return stopPlay();
+        goTo(cur + 1);
+    }, 1200);
+}
+
+function stopPlay() {
+    clearInterval(timer);
+    timer = null;
+    $('nav-play').classList.remove('on');
+    $('nav-play').textContent = '▶▶';
+}
+
+function esc(s) {
+    return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+// --- Eventi ---
+$('btn-file').onclick = () => $('file-input').click();
+$('file-input').onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => loadPgn(String(reader.result));
+    reader.readAsText(file);
+    e.target.value = '';
+};
+$('btn-paste').onclick = () => { $('paste-modal').classList.add('active'); $('paste-text').focus(); };
+$('paste-cancel').onclick = () => $('paste-modal').classList.remove('active');
+$('paste-ok').onclick = () => {
+    const text = $('paste-text').value;
+    if (!text.trim()) return;
+    $('paste-modal').classList.remove('active');
+    loadPgn(text);
+};
+$('btn-sample').onclick = () => loadPgn(SAMPLE_PGN);
+$('game-select').onchange = e => selectGame(+e.target.value);
+
+$('nav-first').onclick = () => { stopPlay(); goTo(0); };
+$('nav-prev').onclick = () => { stopPlay(); goTo(cur - 1); };
+$('nav-next').onclick = () => { stopPlay(); goTo(cur + 1); };
+$('nav-last').onclick = () => { stopPlay(); goTo(game.plies.length); };
+$('nav-play').onclick = togglePlay;
+$('nav-flip').onclick = () => { flipped = !flipped; renderBoard(); };
+$('moves').onclick = e => { const i = e.target.dataset && e.target.dataset.i; if (i) { stopPlay(); goTo(+i); } };
+
+document.addEventListener('keydown', e => {
+    if (!game || $('paste-modal').classList.contains('active')) return;
+    const map = { ArrowLeft: cur - 1, ArrowRight: cur + 1, Home: 0, End: game.plies.length };
+    if (e.key in map) { e.preventDefault(); stopPlay(); goTo(map[e.key]); }
+});
+
+// Swipe orizzontale sulla scacchiera: sinistra = avanti, destra = indietro.
+let touchX = null;
+$('board').addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
+$('board').addEventListener('touchend', e => {
+    if (touchX === null || !game) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 40) { stopPlay(); goTo(cur + (dx < 0 ? 1 : -1)); }
+});
+
+// --- Avvio: riapre l'ultima partita caricata, se c'è ---
+let saved = null;
+try { saved = localStorage.getItem(STORAGE_KEY); } catch { /* storage non disponibile */ }
+if (saved) loadPgn(saved, { remember: false });
+else { renderBoard(); updateNav(); setMessage('Carica un file .pgn oppure prova l\'esempio'); }
+</script>
+</body>
+</html>

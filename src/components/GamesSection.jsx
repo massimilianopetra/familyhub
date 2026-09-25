@@ -380,6 +380,7 @@ const GAMES = [
   { id: 'forza4',      icon: '🟡', title: 'Forza 4',       desc: 'Allinea 4 pedine in fila prima del tuo avversario.',   color: '#2563eb' },
   { id: 'dama',        icon: '♛', title: 'Dama',          desc: 'Dama italiana classica: cattura o blocca l\'avversario.', color: '#8b2e2e' },
   { id: '2048',        icon: '🔢', title: '2048',          desc: 'Unisci le tessere fino a raggiungere 2048.',           color: '#edc22e' },
+  { id: 'pgn',         icon: '♞', title: 'Scacchi PGN',   desc: 'Carica una partita da file .pgn e rivedila mossa per mossa.', color: '#a16207' },
   { id: 'solitari',    icon: '🂡', title: 'Solitari',      desc: 'Klondike, FreeCell, Pyramid, Spider e altri.',         color: '#475569' },
 ]
 
@@ -430,6 +431,7 @@ export default function GamesSection() {
   if (active === 'forza4')     return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/forza4.html`}       title="Forza 4"      icon="🟡" />
   if (active === 'dama')       return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/dama.html`}         title="Dama"         icon="♛" />
   if (active === '2048')       return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/2048.html`}         title="2048"         icon="🔢" />
+  if (active === 'pgn')        return <IframeGame onBack={() => setActive(null)} src={`${import.meta.env.BASE_URL}giochi/pgn.html`}          title="Scacchi PGN"  icon="♞" />
   if (active === 'solitari')   return <SolitaireMenu onBack={() => setActive(null)} onSelect={setActive} />
   if (active === 'klondike')   return <IframeGame onBack={() => setActive('solitari')} src={`${import.meta.env.BASE_URL}giochi/klondike.html`} title="Klondike" icon="🂡" />
   if (active === 'freecell')   return <IframeGame onBack={() => setActive('solitari')} src={`${import.meta.env.BASE_URL}giochi/freecell.html`} title="FreeCell" icon="🂮" />
