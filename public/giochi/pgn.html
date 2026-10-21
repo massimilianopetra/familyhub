@@ -96,6 +96,42 @@
         .moves .summary { font-size: 0.68rem; color: var(--muted); border-bottom: 1px solid #2b2d3a; padding-bottom: 3px; margin-bottom: 3px; }
         .moves .empty { color: var(--muted); text-align: center; padding-top: 18px; font-size: 0.72rem; }
 
+        /* Mosse libere: casa selezionata + destinazioni legali (pallino, anello se cattura). */
+        .board .cell { cursor: pointer; }
+        .cell.sel.light { background: #cdd26a; }
+        .cell.sel.dark { background: #aaa23a; }
+        .cell.dest::after { content: ''; position: absolute; width: 28%; height: 28%; border-radius: 50%; background: rgba(20,85,30,0.5); pointer-events: none; }
+        .cell.dest.cap::after { width: 100%; height: 100%; border-radius: 0; background: radial-gradient(transparent 0 72%, rgba(20,85,30,0.55) 73%); }
+
+        .branch-bar { display: flex; align-items: center; gap: 6px; background: #0c2a3a; border: 1px solid #1e5a7a; border-radius: 5px; padding: 4px 6px 4px 8px; font-size: 0.7rem; color: #7dd3fc; }
+        .branch-bar[hidden] { display: none; }
+        .branch-bar span { flex: 1; }
+        .branch-bar button { padding: 4px 8px; border: none; border-radius: 5px; background: #38bdf8; color: #0f172a; font-weight: bold; font-size: 0.68rem; cursor: pointer; }
+        .moves .mv.var { color: #7dd3fc; font-style: italic; }
+        .moves .mv.var.cur { color: #111; }
+
+        /* Editor di posizione: sostituisce navigazione/analisi/mosse finché è aperto. */
+        .editor { display: flex; flex-direction: column; gap: 5px; }
+        .editor[hidden] { display: none; }
+        .palette { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .palette button { height: 40px; border: 2px solid var(--hidden); border-radius: 6px; background: #b58863; padding: 2px; cursor: pointer; font-size: 1.1rem; }
+        .palette button img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .palette button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+        .editor-row { display: flex; gap: 5px; }
+        .editor-row button { flex: 1; padding: 8px 4px; border: none; border-radius: 6px; background: #3a3d4d; color: var(--text); font-weight: bold; font-size: 0.72rem; cursor: pointer; }
+        .editor-row button.primary { background: #38bdf8; color: #0f172a; }
+        .game-container.editing .nav, .game-container.editing .engine,
+        .game-container.editing .moves, .game-container.editing .branch-bar { display: none !important; }
+
+        .choice-list { display: flex; flex-direction: column; gap: 6px; }
+        .choice-list button { text-align: left; padding: 10px; border: 1px solid var(--hidden); border-radius: 8px; background: var(--empty); color: var(--text); font-weight: bold; font-size: 0.82rem; cursor: pointer; }
+        .choice-list small { display: block; font-weight: normal; color: var(--muted); font-size: 0.68rem; margin-top: 2px; }
+        .promo-box { max-width: 300px; }
+        .promo-choices { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .promo-choices button { aspect-ratio: 1; border: none; border-radius: 8px; background: #f0d9b5; cursor: pointer; padding: 4px; }
+        .promo-choices img { width: 100%; height: 100%; display: block; }
+        #new-cancel, #promo-cancel { background: #3a3d4d; color: var(--text); }
+
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
         .modal-overlay.active { display: flex; }
         .modal-box { background: #2a2b36; border: 1px solid #44475a; border-radius: 14px; padding: 16px; max-width: 420px; width: 92%; box-shadow: 0 24px 60px rgba(0,0,0,0.85); }
@@ -112,7 +148,7 @@
     <div class="top-controls">
         <button class="btn" id="btn-file">📂 Carica file</button>
         <button class="btn" id="btn-paste">📋 Incolla</button>
-        <button class="btn" id="btn-sample">♟ Esempio</button>
+        <button class="btn" id="btn-new">➕ Nuova</button>
         <button class="btn" id="btn-engine">🧠 Analisi</button>
     </div>
     <input type="file" id="file-input" accept=".pgn,.txt,application/x-chess-pgn,text/plain" hidden>
@@ -120,7 +156,7 @@
 
     <div class="info">
         <div class="players" id="info-players">Nessuna partita caricata</div>
-        <div class="meta" id="info-meta">Carica un file .pgn o incolla il testo della partita</div>
+        <div class="meta" id="info-meta">Carica un file .pgn, incolla il testo o premi ➕ Nuova</div>
     </div>
 
     <div class="main">
@@ -144,9 +180,43 @@
                 <button id="btn-full">📊 Partita</button>
                 <a class="credit" href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener" title="Motore Stockfish.js 19 — licenza GPLv3, codice sorgente">ⓘ</a>
             </div>
+            <div class="branch-bar" id="branch-bar" hidden><span id="branch-text"></span><button id="branch-back">↩ Torna alla partita</button></div>
             <div class="message-bar" id="message"></div>
             <div class="moves" id="moves"><div class="empty">Le mosse appariranno qui</div></div>
+            <div class="editor" id="editor" hidden>
+                <div class="palette" id="palette"></div>
+                <div class="editor-row">
+                    <button id="ed-turn"></button>
+                    <button id="ed-start">♟ Iniziale</button>
+                    <button id="ed-clear">🗑 Svuota</button>
+                </div>
+                <div class="editor-row">
+                    <button id="ed-cancel">Annulla</button>
+                    <button id="ed-done" class="primary">✔ Gioca da qui</button>
+                </div>
+            </div>
         </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="new-modal">
+    <div class="modal-box">
+        <h3>➕ Nuova</h3>
+        <div class="choice-list" id="new-choices">
+            <button data-new="start">♟ Dalla posizione iniziale<small>Gioca le mosse che vuoi, anche con l'aiuto di Stockfish</small></button>
+            <button data-new="empty">✏️ Scacchiera vuota<small>Componi una posizione pezzo per pezzo</small></button>
+            <button data-new="edit" id="new-edit">📍 Modifica la posizione attuale<small>Parti da quella che vedi sulla scacchiera</small></button>
+            <button data-new="sample">📜 Partita d'esempio<small>L'Immortale, Anderssen–Kieseritzky 1851</small></button>
+        </div>
+        <div class="modal-actions"><button id="new-cancel">Annulla</button></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="promo-modal">
+    <div class="modal-box promo-box">
+        <h3>Promozione a…</h3>
+        <div class="promo-choices" id="promo-choices"></div>
+        <div class="modal-actions"><button id="promo-cancel">Annulla</button></div>
     </div>
 </div>
 
@@ -406,12 +476,17 @@ function tokenize(movetext) {
     return tokens;
 }
 
+// evals/best: riempiti da "Analizza partita", un elemento per posizione.
+// editable: partita libera/variante, dove una mossa diversa sostituisce il seguito.
+function newGame(headers, pos) {
+    return { headers, positions: [pos], plies: [], intro: '', result: headers.Result || '', error: '', evals: [], best: [], analyzed: false, editable: false };
+}
+
 function buildGame(raw) {
     let pos;
     try { pos = parseFen(raw.headers.FEN || START_FEN); }
     catch { pos = parseFen(START_FEN); }
-    // evals/best: riempiti da "Analizza partita", un elemento per posizione.
-    const game = { headers: raw.headers, positions: [pos], plies: [], intro: '', result: raw.headers.Result || '', error: '', evals: [], best: [], analyzed: false };
+    const game = newGame(raw.headers, pos);
     for (const tk of tokenize(raw.movetext)) {
         if (game.error) break;
         const last = game.plies[game.plies.length - 1];
@@ -601,6 +676,9 @@ let games = [], game = null, cur = 0, flipped = false, timer = null;
 let analysisOn = false, bestArrow = null, liveToken = 0, fullRunning = false, fullCancel = false;
 const LIVE_DEPTH = 18, FULL_DEPTH = 12;
 const QSYM = { inacc: '?!', mistake: '?', blunder: '??' };
+// selected: casa del pezzo scelto per muovere (-1 = nessuna); editor: stato dell'editor di posizione (null = chiuso).
+let selected = -1, editor = null;
+const FREE_META = 'Partita libera — tocca un pezzo e poi la casa dove spostarlo';
 const $ = id => document.getElementById(id);
 
 function loadPgn(text, { remember = true } = {}) {
@@ -618,21 +696,192 @@ function loadPgn(text, { remember = true } = {}) {
 
 function selectGame(i) {
     stopPlay();
+    if (editor) closeEditor(false);
     game = games[i];
     $('game-select').value = i;
+    renderInfo();
+    renderMoves();
+    updateBranchBar();
+    goTo(0);
+}
+
+function renderInfo() {
     const h = game.headers;
     const elo = e => (e && e !== '?' ? ` (${e})` : '');
     $('info-players').textContent = `⚪ ${h.White || '?'}${elo(h.WhiteElo)}  –  ⚫ ${h.Black || '?'}${elo(h.BlackElo)}`;
     const meta = [h.Event, h.Site, h.Date && h.Date.replace(/\.\?\?/g, ''), h.Round && h.Round !== '-' ? 'Turno ' + h.Round : '', game.result]
         .filter(x => x && x !== '?');
-    $('info-meta').textContent = meta.join(' · ') || '—';
+    $('info-meta').textContent = game.meta || meta.join(' · ') || '—';
+}
+
+function startFreeGame(pos, meta) {
+    const headers = { White: 'Bianco', Black: 'Nero' };
+    if (toFen(pos) !== START_FEN) { headers.FEN = toFen(pos); headers.SetUp = '1'; }
+    const g = newGame(headers, pos);
+    g.editable = true;
+    g.meta = meta;
+    games = [g];
+    $('game-select').hidden = true;
+    selectGame(0);
+}
+
+// ==========================================
+// ✋ MOSSE LIBERE
+// ==========================================
+function playUserMove(m) {
+    stopPlay();
+    selected = -1;
+    const next = game.plies[cur];
+    if (next && toUci(next.move) === toUci(m)) return goTo(cur + 1);
+    if (!game.editable) {
+        // Partita caricata: una mossa diversa apre una variante di prova, l'originale resta intatta.
+        const parent = game;
+        game = {
+            ...newGame(parent.headers, parent.positions[0]), editable: true, parent, branchAt: cur, meta: parent.meta, intro: parent.intro,
+            positions: parent.positions.slice(0, cur + 1), plies: parent.plies.slice(0, cur).map(p => ({ ...p })),
+            evals: parent.evals.slice(0, cur + 1), best: parent.best.slice(0, cur + 1),
+        };
+    } else {
+        game.positions.length = cur + 1;
+        game.plies.length = cur;
+        game.evals.length = Math.min(game.evals.length, cur + 1);
+        game.best.length = Math.min(game.best.length, cur + 1);
+    }
+    game.result = '';
+    const pos = game.positions[cur];
+    game.plies.push({ san: toSan(pos, m), move: m, comment: '', num: pos.fullmove, color: pos.turn });
+    game.positions.push(applyMove(pos, m));
     renderMoves();
-    goTo(0);
+    updateBranchBar();
+    goTo(cur + 1);
+}
+
+async function onBoardTap(s) {
+    if (!game) startFreeGame(parseFen(START_FEN), FREE_META);
+    stopPlay();
+    const pos = game.positions[cur];
+    if (selected >= 0) {
+        const cands = legalMoves(pos).filter(m => m.from === selected && m.to === s);
+        if (cands.length) {
+            let m = cands[0];
+            if (m.promo) {
+                const t = await pickPromotion(pos.turn);
+                if (!t) { selected = -1; renderBoard(); return; }
+                m = cands.find(c => c.promo === t);
+            }
+            return playUserMove(m);
+        }
+    }
+    const p = pos.board[s];
+    selected = p && colorOf(p) === pos.turn && selected !== s && legalMoves(pos).some(m => m.from === s) ? s : -1;
+    renderBoard();
+}
+
+function pickPromotion(color) {
+    return new Promise(resolve => {
+        const close = t => { $('promo-modal').classList.remove('active'); resolve(t); };
+        $('promo-choices').innerHTML = 'QRBN'.split('').map(t =>
+            `<button data-t="${t}"><img src="${PIECE_DIR}${color}${t}.svg" alt="${t}"></button>`).join('');
+        $('promo-choices').onclick = e => { const b = e.target.closest('button'); if (b) close(b.dataset.t); };
+        $('promo-cancel').onclick = () => close(null);
+        $('promo-modal').classList.add('active');
+    });
+}
+
+function updateBranchBar() {
+    const on = !!(game && game.parent);
+    $('branch-bar').hidden = !on;
+    if (!on) return;
+    const pos = game.positions[game.branchAt];
+    $('branch-text').textContent = `🔀 Variante di prova da ${pos.fullmove}${pos.turn === 'w' ? '.' : '...'}`;
+}
+
+function backToGame() {
+    const at = game.branchAt;
+    game = game.parent;
+    renderMoves();
+    updateBranchBar();
+    goTo(at);
+}
+
+// ==========================================
+// ✏️ EDITOR DI POSIZIONE
+// ==========================================
+const EDIT_TOOLS = ['K', 'Q', 'R', 'B', 'N', 'P', 'x', 'k', 'q', 'r', 'b', 'n', 'p'];
+
+function openEditor(fromPos) {
+    stopPlay();
+    liveToken++;
+    fullCancel = true;
+    if (engine.worker) engine.stop();
+    selected = -1;
+    bestArrow = null;
+    editor = { board: fromPos ? fromPos.board.slice() : new Array(64).fill(null), turn: fromPos ? fromPos.turn : 'w', tool: 'P' };
+    document.querySelector('.game-container').classList.add('editing');
+    $('editor').hidden = false;
+    $('board-wrap').classList.remove('analysis');
+    $('info-players').textContent = '✏️ Componi la posizione';
+    $('info-meta').textContent = 'Scegli un pezzo qui sotto e tocca le case della scacchiera';
+    renderPalette();
+    renderBoard();
+    setMessage('Tocca di nuovo una casa per togliere il pezzo');
+}
+
+function closeEditor(restore = true) {
+    editor = null;
+    document.querySelector('.game-container').classList.remove('editing');
+    $('editor').hidden = true;
+    $('board-wrap').classList.toggle('analysis', analysisOn);
+    if (!restore) return;
+    if (game) { renderInfo(); goTo(cur); }
+    else {
+        $('info-players').textContent = 'Nessuna partita caricata';
+        $('info-meta').textContent = 'Carica un file .pgn, incolla il testo o premi ➕ Nuova';
+        renderBoard();
+        setMessage('');
+    }
+}
+
+function renderPalette() {
+    $('palette').innerHTML = EDIT_TOOLS.map(t => `<button data-t="${t}" class="${editor.tool === t ? 'on' : ''}">${
+        t === 'x' ? '🧽' : `<img src="${PIECE_DIR}${colorOf(t)}${t.toUpperCase()}.svg" alt="${t}">`}</button>`).join('');
+    $('ed-turn').textContent = editor.turn === 'w' ? 'Muove: ⚪ Bianco' : 'Muove: ⚫ Nero';
+}
+
+function editorTap(s) {
+    const b = editor.board, t = editor.tool;
+    if (t === 'x' || b[s] === t) b[s] = null;
+    else {
+        // Un solo re per colore: piazzarlo altrove lo sposta.
+        if (t === 'K' || t === 'k') { const old = b.indexOf(t); if (old >= 0) b[old] = null; }
+        b[s] = t;
+    }
+    renderBoard();
+}
+
+function finishEditor() {
+    const b = editor.board;
+    const count = p => b.filter(x => x === p).length;
+    if (count('K') !== 1 || count('k') !== 1) return setMessage('Serve esattamente un re bianco e un re nero', 'warn');
+    if (b.some((p, sq) => p && p.toUpperCase() === 'P' && (sq < 8 || sq >= 56))) return setMessage('I pedoni non possono stare sulla prima o sull\'ultima traversa', 'warn');
+    // Arrocco consentito solo se re e torre sono ancora sulle case di partenza.
+    let castling = '';
+    if (b[4] === 'K' && b[7] === 'R') castling += 'K';
+    if (b[4] === 'K' && b[0] === 'R') castling += 'Q';
+    if (b[60] === 'k' && b[63] === 'r') castling += 'k';
+    if (b[60] === 'k' && b[56] === 'r') castling += 'q';
+    const pos = { board: b.slice(), turn: editor.turn, castling, ep: -1, fullmove: 1 };
+    const other = pos.turn === 'w' ? 'b' : 'w';
+    if (isAttacked(pos, kingSquare(pos, other), pos.turn))
+        return setMessage(`Il re ${other === 'w' ? 'bianco' : 'nero'} è sotto scacco ma non tocca a lui muovere`, 'warn');
+    closeEditor(false);
+    startFreeGame(pos, 'Posizione composta — tocca un pezzo e poi la casa dove spostarlo');
 }
 
 function goTo(n) {
     if (!game) return;
     cur = Math.max(0, Math.min(n, game.plies.length));
+    selected = -1;
     renderBoard();
     document.querySelectorAll('.mv').forEach(el => el.classList.toggle('cur', +el.dataset.i === cur));
     const el = document.querySelector('.mv.cur');
@@ -647,9 +896,10 @@ function goTo(n) {
 }
 
 function renderBoard() {
-    const pos = game ? game.positions[cur] : parseFen(START_FEN);
-    const last = game && cur > 0 ? game.plies[cur - 1].move : null;
-    const checkSq = inCheck(pos) ? kingSquare(pos, pos.turn) : -1;
+    const pos = editor ? { board: editor.board } : game ? game.positions[cur] : parseFen(START_FEN);
+    const last = !editor && game && cur > 0 ? game.plies[cur - 1].move : null;
+    const checkSq = !editor && inCheck(pos) ? kingSquare(pos, pos.turn) : -1;
+    const dests = !editor && game && selected >= 0 ? legalMoves(pos).filter(m => m.from === selected) : [];
     let html = '';
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
@@ -657,11 +907,14 @@ function renderBoard() {
             const cls = ['cell', (r + f) % 2 ? 'light' : 'dark'];
             if (last && (s === last.from || s === last.to)) cls.push('last');
             if (s === checkSq) cls.push('check');
+            if (s === selected) cls.push('sel');
+            const d = dests.find(m => m.to === s);
+            if (d) cls.push('dest', d.capture ? 'cap' : '');
             const p = pos.board[s];
             let inner = p ? `<img class="piece" src="${PIECE_DIR}${colorOf(p)}${p.toUpperCase()}.svg" alt="${p}" draggable="false">` : '';
             if (col === 0) inner += `<span class="coord rank">${r + 1}</span>`;
             if (row === 7) inner += `<span class="coord file">${FILES[f]}</span>`;
-            html += `<div class="${cls.join(' ')}">${inner}</div>`;
+            html += `<div class="${cls.join(' ')}" data-s="${s}">${inner}</div>`;
         }
     }
     html += '<svg class="arrow" id="arrow" viewBox="0 0 8 8"></svg>';
@@ -720,8 +973,8 @@ async function analyzeCurrent() {
     const token = ++liveToken;
     bestArrow = null;
     drawArrow();
-    if (!analysisOn || fullRunning) return;
-    if (!game) { setEngineLine('Carica una partita da analizzare'); return; }
+    if (!analysisOn || fullRunning || editor) return;
+    if (!game) { setEngineLine('Carica una partita o tocca un pezzo per iniziare'); return; }
     const g = game, pos = g.positions[cur];
     const term = terminalScore(pos);
     if (term) { setEval(term); setEngineLine(`<b>${scoreText(term)}</b> partita finita`); return; }
@@ -745,7 +998,7 @@ function toggleAnalysis() {
     analysisOn = !analysisOn;
     $('btn-engine').classList.toggle('on', analysisOn);
     $('engine').hidden = !analysisOn;
-    $('board-wrap').classList.toggle('analysis', analysisOn);
+    $('board-wrap').classList.toggle('analysis', analysisOn && !editor);
     if (!analysisOn) {
         liveToken++;
         fullCancel = true;
@@ -824,7 +1077,7 @@ function figurine(san) {
 function renderMoves() {
     const box = $('moves');
     if (!game.plies.length) {
-        box.innerHTML = `<div class="empty">${game.error ? esc(game.error) : 'Nessuna mossa in questa partita'}</div>`;
+        box.innerHTML = `<div class="empty">${game.error ? esc(game.error) : game.editable ? 'Le mosse che giochi appariranno qui' : 'Nessuna mossa in questa partita'}</div>`;
         return;
     }
     let html = game.analyzed ? analysisSummary(game) : '';
@@ -832,7 +1085,8 @@ function renderMoves() {
         if (p.color === 'w') html += `<span class="num">${p.num}.</span>`;
         else if (i === 0) html += `<span class="num">${p.num}...</span>`;
         const q = p.q ? `<span class="q ${p.q}">${QSYM[p.q]}</span>` : '';
-        html += `<span class="mv${p.comment ? ' has-comment' : ''}" data-i="${i + 1}">${esc(figurine(p.san))}${q}</span> `;
+        const cls = (p.comment ? ' has-comment' : '') + (game.parent && i >= game.branchAt ? ' var' : '');
+        html += `<span class="mv${cls}" data-i="${i + 1}">${esc(figurine(p.san))}${q}</span> `;
     });
     if (game.result && game.result !== '*') html += `<span class="result">${esc(game.result)}</span>`;
     box.innerHTML = html;
@@ -854,7 +1108,9 @@ function updateMessage() {
         return setMessage(`Fine partita: ${game.result}${txt ? ' — ' + txt : ''}`, 'highlight');
     }
     if (inCheck(pos)) return setMessage('Scacco!', 'highlight');
-    setMessage(cur === 0 ? 'Posizione iniziale — premi ▶ per avanzare' : `Mossa ${cur} di ${game.plies.length} · tocca al ${pos.turn === 'w' ? 'Bianco' : 'Nero'}`);
+    const side = pos.turn === 'w' ? 'Bianco' : 'Nero';
+    if (!game.plies.length) return setMessage(`Tocca al ${side}: tocca un pezzo e poi la casa dove spostarlo`);
+    setMessage(cur === 0 ? 'Posizione iniziale — premi ▶ per avanzare' : `Mossa ${cur} di ${game.plies.length} · tocca al ${side}`);
 }
 
 function setMessage(text, kind = '') {
@@ -911,7 +1167,31 @@ $('paste-ok').onclick = () => {
     $('paste-modal').classList.remove('active');
     loadPgn(text);
 };
-$('btn-sample').onclick = () => loadPgn(SAMPLE_PGN);
+$('btn-new').onclick = () => { $('new-edit').hidden = !game || !!editor; $('new-modal').classList.add('active'); };
+$('new-cancel').onclick = () => $('new-modal').classList.remove('active');
+$('new-choices').onclick = e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    $('new-modal').classList.remove('active');
+    const k = b.dataset.new;
+    if (k === 'start') startFreeGame(parseFen(START_FEN), FREE_META);
+    else if (k === 'empty') openEditor(null);
+    else if (k === 'edit') openEditor(game.positions[cur]);
+    else loadPgn(SAMPLE_PGN);
+};
+$('branch-back').onclick = backToGame;
+$('board').addEventListener('click', e => {
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    if (editor) editorTap(+cell.dataset.s);
+    else onBoardTap(+cell.dataset.s);
+});
+$('palette').onclick = e => { const b = e.target.closest('button'); if (b) { editor.tool = b.dataset.t; renderPalette(); } };
+$('ed-turn').onclick = () => { editor.turn = editor.turn === 'w' ? 'b' : 'w'; renderPalette(); };
+$('ed-start').onclick = () => { editor.board = parseFen(START_FEN).board; editor.turn = 'w'; renderPalette(); renderBoard(); };
+$('ed-clear').onclick = () => { editor.board = new Array(64).fill(null); renderBoard(); };
+$('ed-cancel').onclick = () => closeEditor();
+$('ed-done').onclick = finishEditor;
 $('game-select').onchange = e => selectGame(+e.target.value);
 
 $('nav-first').onclick = () => { stopPlay(); goTo(0); };
@@ -925,7 +1205,7 @@ $('btn-full').onclick = analyzeGame;
 $('moves').onclick = e => { const mv = e.target.closest('.mv'); if (mv) { stopPlay(); goTo(+mv.dataset.i); } };
 
 document.addEventListener('keydown', e => {
-    if (!game || $('paste-modal').classList.contains('active')) return;
+    if (!game || editor || document.querySelector('.modal-overlay.active')) return;
     const map = { ArrowLeft: cur - 1, ArrowRight: cur + 1, Home: 0, End: game.plies.length };
     if (e.key in map) { e.preventDefault(); stopPlay(); goTo(map[e.key]); }
 });
@@ -934,7 +1214,7 @@ document.addEventListener('keydown', e => {
 let touchX = null;
 $('board').addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
 $('board').addEventListener('touchend', e => {
-    if (touchX === null || !game) return;
+    if (touchX === null || !game || editor) return;
     const dx = e.changedTouches[0].clientX - touchX;
     touchX = null;
     if (Math.abs(dx) > 40) { stopPlay(); goTo(cur + (dx < 0 ? 1 : -1)); }
@@ -944,7 +1224,7 @@ $('board').addEventListener('touchend', e => {
 let saved = null;
 try { saved = localStorage.getItem(STORAGE_KEY); } catch { /* storage non disponibile */ }
 if (saved) loadPgn(saved, { remember: false });
-else { renderBoard(); updateNav(); setMessage('Carica un file .pgn oppure prova l\'esempio'); }
+else { renderBoard(); updateNav(); setMessage('Carica un file .pgn, oppure tocca un pezzo per giocare liberamente'); }
 </script>
 </body>
 </html>
