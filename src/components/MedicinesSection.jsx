@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock, displayStock, doseScheduleLabel, nextDoseStatus, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../utils/medicineUtils'
+import { dailyConsumption, daysRemaining, reorderDate, stockStatus, currentStock, displayStock, doseScheduleLabel, nextDoseStatus, lastDoseDate, WEEKDAY_NAMES, WEEKDAY_ORDER } from '../utils/medicineUtils'
 import { saveCache, loadCache } from '../utils/offlineCache'
 
 const UNIT_OPTIONS = ['compresse', 'ml', 'bustine', 'gocce', 'fiale', 'capsule', 'dosi', 'iniezioni', 'cerotti', 'flaconi']
@@ -111,6 +111,17 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
   const [error,           setError]           = useState('')
   const mouseDownOnBackdrop = useRef(false)
 
+  // True se in modifica è cambiato qualcosa che incide sul consumo scorte
+  function scheduleChanged() {
+    if (!medicine) return false
+    const sortedDays = arr => (arr || []).map(Number).sort().join(',')
+    return Number(unitsPerIntake) !== Number(medicine.units_per_intake)
+      || scheduleType !== (medicine.schedule_type ?? 'interval')
+      || (scheduleType === 'interval' && Number(doseIntervalDays) !== Number(medicine.dose_interval_days ?? 1))
+      || (scheduleType === 'weekdays' && sortedDays(weekdays) !== sortedDays(medicine.weekdays))
+      || (startDate || '') !== (medicine.start_date || '')
+  }
+
   async function handleSave() {
     if (!medicineName.trim()) { setError('Il nome del farmaco è obbligatorio'); return }
     if (Number(unitsPerIntake) < 0 || Number(stockUnits) < 0) {
@@ -128,14 +139,27 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
     // Se la quantità mostrata (già calcolata ad oggi) viene modificata, è un nuovo
     // conteggio: registriamo oggi come nuova base da cui scalare il consumo futuro.
     const stockChanged = Math.round(Number(stockUnits) * 10) / 10 !== initialStock
+    let stockUnitsOut = stockChanged ? Number(stockUnits) : (medicine?.stock_units ?? Number(stockUnits))
+    let stockAsOfOut  = stockChanged ? todayStr() : (medicine?.stock_as_of ?? todayStr())
+
+    // Cambio di posologia su una terapia esistente: le scorte di oggi vanno
+    // calcolate con lo schema VECCHIO e fissate sul db, così il numero mostrato
+    // non cambia e da domani il consumo viene scalato solo con lo schema NUOVO
+    // (altrimenti il nuovo schema verrebbe applicato retroattivamente fino
+    // all'ultimo stock_as_of).
+    if (isEdit && !stockChanged && scheduleChanged()) {
+      stockUnitsOut = currentStock(medicine)
+      stockAsOfOut  = todayStr()
+    }
+
     const payload = {
       person_name:       medicine?.person_name ?? personEmail,
       medicine_name:     medicineName.trim(),
       dosage_note:       dosageNote.trim() || null,
       unit_label:         unitLabel,
       units_per_intake:   Number(unitsPerIntake),
-      stock_units:        stockChanged ? Number(stockUnits) : (medicine?.stock_units ?? Number(stockUnits)),
-      stock_as_of:        stockChanged ? todayStr() : (medicine?.stock_as_of ?? todayStr()),
+      stock_units:        stockUnitsOut,
+      stock_as_of:        stockAsOfOut,
       is_active:          isActive,
       end_date:           endDate || null,
       start_date:         startDate || todayStr(),
@@ -196,14 +220,13 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
         <div>
           <div style={lbl}>Posologia (facoltativo)</div>
           <input value={dosageNote} onChange={e => setDosageNote(e.target.value)}
-            placeholder="Es. 1 compressa dopo i pasti" disabled={isEdit}
-            style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
+            placeholder="Es. 1 compressa dopo i pasti" style={inp} />
         </div>
 
         <div>
           <div style={lbl}>Unità per assunzione</div>
-          <input type="number" min="0" step="0.5" value={unitsPerIntake} disabled={isEdit}
-            onChange={e => setUnitsPerIntake(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
+          <input type="number" min="0" step="0.5" value={unitsPerIntake}
+            onChange={e => setUnitsPerIntake(e.target.value)} style={inp} />
         </div>
 
         <div>
@@ -214,11 +237,11 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
               { value: 'weekdays', label: 'Giorni della settimana' },
               { value: 'occasional', label: 'Al bisogno' },
             ].map(opt => (
-              <button key={opt.value} type="button" disabled={isEdit}
-                onClick={() => !isEdit && setScheduleType(opt.value)}
+              <button key={opt.value} type="button"
+                onClick={() => setScheduleType(opt.value)}
                 style={{
                   flex: 1, padding: '9px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700',
-                  cursor: isEdit ? 'not-allowed' : 'pointer', opacity: isEdit ? 0.55 : 1,
+                  cursor: 'pointer',
                   background: scheduleType === opt.value ? '#1d4ed8' : '#0f172a',
                   border: `1px solid ${scheduleType === opt.value ? '#1d4ed8' : '#334155'}`,
                   color: scheduleType === opt.value ? '#fff' : '#94a3b8',
@@ -232,8 +255,8 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
         {scheduleType === 'interval' && (
           <div>
             <div style={lbl}>Ogni quanti giorni *</div>
-            <input type="number" min="1" step="1" value={doseIntervalDays} disabled={isEdit}
-              onChange={e => setDoseIntervalDays(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
+            <input type="number" min="1" step="1" value={doseIntervalDays}
+              onChange={e => setDoseIntervalDays(e.target.value)} style={inp} />
           </div>
         )}
         {scheduleType === 'weekdays' && (
@@ -243,11 +266,11 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
               {WEEKDAY_ORDER.map(d => {
                 const selected = weekdays.includes(d)
                 return (
-                  <button key={d} type="button" disabled={isEdit}
-                    onClick={() => !isEdit && setWeekdays(prev => selected ? prev.filter(x => x !== d) : [...prev, d])}
+                  <button key={d} type="button"
+                    onClick={() => setWeekdays(prev => selected ? prev.filter(x => x !== d) : [...prev, d])}
                     style={{
                       padding: '8px 6px', minWidth: '40px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '700',
-                      cursor: isEdit ? 'not-allowed' : 'pointer', opacity: isEdit ? 0.55 : 1,
+                      cursor: 'pointer',
                       background: selected ? '#1d4ed8' : '#0f172a',
                       border: `1px solid ${selected ? '#1d4ed8' : '#334155'}`,
                       color: selected ? '#fff' : '#94a3b8',
@@ -261,7 +284,7 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
         )}
         <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '-6px' }}>
           {isEdit
-            ? 'Per cambiare questi valori elimina questa terapia e creane una nuova: determinano il consumo scorte già calcolato nel tempo. Le scorte si aggiornano solo con ➕ Ricarica, ➖ Consumo o 🔄 Correggi.'
+            ? 'Se cambi la posologia, le scorte di oggi restano quelle attuali (calcolate con lo schema precedente) e da domani il consumo viene scalato con quello nuovo. Le quantità si correggono con ➕ Ricarica, ➖ Consumo o 🔄 Correggi.'
             : scheduleType === 'occasional'
               ? 'Per uso saltuario senza schema fisso (es. un antidolorifico preso solo quando serve): niente promemoria dose, le scorte scendono solo quando registri un ➖ Consumo.'
               : "Determina sia il consumo scorte sia il promemoria dose. Es. una pastiglia al giorno → ogni 1 giorno; un'iniezione ogni 15gg → ogni 15 giorni; una pastiglia solo giovedì e domenica → giorni della settimana."}
@@ -292,8 +315,8 @@ function MedicineModal({ medicine, personEmail, userId, onClose, onSaved, onDele
 
         <div>
           <div style={lbl}>Prossima dose (o inizio terapia)</div>
-          <input type="date" value={startDate} disabled={isEdit}
-            onChange={e => setStartDate(e.target.value)} style={{ ...inp, opacity: isEdit ? 0.55 : 1, cursor: isEdit ? 'not-allowed' : 'text' }} />
+          <input type="date" value={startDate}
+            onChange={e => setStartDate(e.target.value)} style={inp} />
         </div>
 
         <div>
@@ -493,6 +516,30 @@ function ResetStockControl({ medicine, onReset }) {
   )
 }
 
+// ── Ultima assunzione (calcolata dalla posologia, non salvata) ───
+function LastDoseControl({ medicine }) {
+  const [open, setOpen] = useState(false)
+  const last = lastDoseDate(medicine)
+
+  let text = 'Nessuna assunzione prevista finora'
+  if (last) {
+    const today = new Date(todayStr() + 'T00:00:00')
+    const days = Math.round((today - new Date(last + 'T00:00:00')) / 86400000)
+    const when = days === 0 ? 'oggi' : days === 1 ? 'ieri' : `${days} giorni fa`
+    text = `Ultima presa: ${when} (${fmtDate(last)})`
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '6px', color: '#94a3b8', padding: '4px 10px', fontSize: '0.72rem', fontWeight: '600', cursor: 'pointer' }}>
+        🕒 Ultima presa
+      </button>
+      {open && <span style={{ fontSize: '0.78rem', color: '#f1f5f9' }}>{text}</span>}
+    </div>
+  )
+}
+
 // ── Card singola terapia ─────────────────────────────────────────
 function MedicineCard({ medicine, isOwner, onEdit, onRestocked, onConsumed, onReset }) {
   const status = stockStatus(medicine)
@@ -500,6 +547,7 @@ function MedicineCard({ medicine, isOwner, onEdit, onRestocked, onConsumed, onRe
   const dr = daysRemaining(medicine)
   const rDate = reorderDate(medicine)
   const nextDose = nextDoseStatus(medicine)
+  const showLastDose = medicine.is_active && medicine.schedule_type !== 'occasional'
 
   return (
     <div style={{ background: '#1e293b', border: '1px solid #334155', borderLeft: `4px solid ${status.color}`, borderRadius: '12px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -544,6 +592,8 @@ function MedicineCard({ medicine, isOwner, onEdit, onRestocked, onConsumed, onRe
           <span>💉 <strong style={{ color: nextDose.color }}>{nextDose.label}</strong> ({fmtDate(nextDose.date)})</span>
         )}
       </div>
+
+      {showLastDose && <LastDoseControl medicine={medicine} />}
 
       {isOwner && (
         <div style={{ marginTop: '4px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

@@ -186,6 +186,40 @@ export function nextDoseDate(m) {
   return isWeekdaySchedule(m) ? nextDoseDateWeekdays(m) : nextDoseDateInterval(m)
 }
 
+// Ultima data di assunzione prevista dalla posologia, oggi compreso (non è
+// salvata sul db: è dedotta dallo schema, come nextDoseDate). null se la
+// terapia non è ancora iniziata o non ha uno schema fisso. Se la terapia ha
+// una data di fine già passata, l'ultima dose non va oltre quella data.
+export function lastDoseDate(m) {
+  if (isOccasionalSchedule(m)) return null
+  let end = new Date(); end.setHours(0, 0, 0, 0)
+  if (m.end_date) {
+    const e = new Date(m.end_date + 'T00:00:00')
+    if (e < end) end = e
+  }
+  const start = m.start_date ? new Date(m.start_date + 'T00:00:00') : null
+  if (start && start > end) return null
+
+  if (isWeekdaySchedule(m)) {
+    const days = weekdaySet(m)
+    if (days.size === 0) return null
+    const d = new Date(end)
+    for (let i = 0; i < 7; i++) {
+      if (start && d < start) return null
+      if (days.has(d.getDay())) return dateToStr(d)
+      d.setDate(d.getDate() - 1)
+    }
+    return null
+  }
+
+  if (!start) return null
+  const interval = doseInterval(m)
+  const k = Math.floor(daysBetween(dateToStr(start), dateToStr(end)) / interval)
+  const d = new Date(start)
+  d.setDate(d.getDate() + k * interval)
+  return dateToStr(d)
+}
+
 // Stato della prossima dose: colore + etichetta in base a quanto manca
 export function nextDoseStatus(m) {
   if (!m.is_active) return null
